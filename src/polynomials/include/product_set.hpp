@@ -248,8 +248,9 @@ class PolynomialProductSet {
 
     Real y = 0;
     for (auto&& tensor : *this)
-      y += tensor.coefficient() *
-           tensor(x, no_bounds_check);  // no need to check dimensions every time
+      if (tensor.coefficient() != 0)
+        y += tensor.coefficient() *
+             tensor(x, no_bounds_check);  // no need to check dimensions every time
     return y;
   }
 
