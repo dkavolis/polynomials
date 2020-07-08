@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING, Sequence, Type, Union, cast
 
 import numpy as np
 
@@ -32,7 +32,7 @@ class PCEMeta(type):
     def make_pce(self, size: int, dimensions: int):
         return self._TENSOR_TYPE(size=size, dimensions=dimensions)
 
-    def make_full_set(self, orders: Tuple[int]):
+    def make_full_set(self, orders: Sequence[int]):
         return self._TENSOR_TYPE.full_set(orders)
 
 
@@ -42,7 +42,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         linear_model,
         dimensions: int = 0,
         components: int = 0,
-        full_set: Tuple[int] = None,
+        full_set: Sequence[int] = None,
     ):
         self.linear_model = linear_model
 
@@ -147,7 +147,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
     def predict(self, x):
         return self._pce(x)
 
-    def sensitivity(self, indices: Union[int, Tuple[int]]) -> Real:
+    def sensitivity(self, indices: Union[int, Sequence[int]]) -> Real:
         return self.sobol.sensitivity(indices)
 
     def total_sensitivity(self, index: int) -> Real:
