@@ -313,6 +313,18 @@ class PolynomialProductSet {
     return Sobol<Real, Alloc>{std::move(indices), coefficients_, dimensions_};
   }
 
+  auto polynomials() noexcept -> view<Poly> { return {polynomials_.data(), polynomials_.size()}; }
+  auto polynomials() const noexcept -> view<Poly const> {
+    return {polynomials_.data(), polynomials_.size()};
+  }
+
+  auto coefficients() noexcept -> view<Real> {
+    return {coefficients_.data(), coefficients_.size()};
+  }
+  auto coefficients() const noexcept -> view<Real const> {
+    return {coefficients_.data(), coefficients_.size()};
+  }
+
  private:
   [[nodiscard]] auto to_index(std::size_t index) const noexcept -> std::size_t {
     return index * dimensions_;

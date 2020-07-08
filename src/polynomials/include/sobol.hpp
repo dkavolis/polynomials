@@ -149,18 +149,19 @@ class SobolIterator : public boost::iterator_facade<
 /// Reliability Engineering & System Safety, 93(7), 964–979.
 /// https://doi.org/10.1016/j.ress.2007.04.002
 /// \tparam Real
-/// \tparam Allocator
-template <class Real, template <class> class Allocator = std::allocator>
+/// \tparam Alloc
+template <class Real, template <class> class Alloc = std::allocator>
 class Sobol {
  private:
   using match_vector = boost::container::small_vector<bool, 128>;
 
  public:
+  using indices_vector = std::vector<std::size_t, Alloc<std::size_t>>;
+  using coefficients_vector = std::vector<Real, Alloc<Real>>;
   using View = SobolItemView<Real, std::size_t>;
   using ConstView = SobolItemView<Real const, std::size_t const>;
 
-  Sobol(std::vector<std::size_t, Allocator<std::size_t>> indices,
-        std::vector<Real, Allocator<Real>> coefficients, std::size_t dimensions)
+  Sobol(indices_vector indices, coefficients_vector coefficients, std::size_t dimensions)
       : indices_(std::move(indices)),
         coefficients_(std::move(coefficients)),
         dimensions_(dimensions) {
@@ -263,8 +264,8 @@ class Sobol {
 
  private:
   // copying indices and coefficients allows to have precomputed variance and mean
-  std::vector<std::size_t, Allocator<std::size_t>> indices_;
-  std::vector<Real, Allocator<Real>> coefficients_;
+  indices_vector indices_;
+  coefficients_vector coefficients_;
   std::size_t dimensions_;
   Real variance_;
   Real mean_;

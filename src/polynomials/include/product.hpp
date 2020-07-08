@@ -147,6 +147,9 @@ class PolynomialProduct {
 
   template <typename T>
   using small_vector = boost::container::small_vector<T, N>;
+  using polynomials_vector = small_vector<PolynomialType>;
+  using iterator = typename polynomials_vector::iterator;
+  using const_iterator = typename polynomials_vector::const_iterator;
 
   explicit PolynomialProduct(OrderType dimensions) : polynomials_{dimensions} {}
 
@@ -165,7 +168,9 @@ class PolynomialProduct {
   }
 
   template <class... Args>
-  void emplace_back(Args... args) { polynomials_.emplace_back(std::forward<Args>(args)...); }
+  void emplace_back(Args... args) {
+    polynomials_.emplace_back(std::forward<Args>(args)...);
+  }
 
   auto operator[](std::size_t index) noexcept -> PolynomialType& { return polynomials_[index]; }
   [[nodiscard]] auto operator[](std::size_t index) const noexcept -> PolynomialType const& {
@@ -188,12 +193,12 @@ class PolynomialProduct {
   void dimensions(OrderType new_size) { polynomials_.resize(new_size); }
   [[nodiscard]] auto size() const noexcept -> std::size_t { return dimensions(); }
   void resize(std::size_t new_size) { polynomials_.resize(new_size); }
-  void clear() { polynomials_.clear();}
+  void clear() { polynomials_.clear(); }
 
-  decltype(auto) begin() noexcept { return polynomials_.begin(); }
-  decltype(auto) begin() const noexcept { return polynomials_.begin(); }
-  decltype(auto) end() noexcept { return polynomials_.end(); }
-  decltype(auto) end() const noexcept { return polynomials_.end(); }
+  auto begin() noexcept -> iterator { return polynomials_.begin(); }
+  auto begin() const noexcept -> const_iterator { return polynomials_.begin(); }
+  auto end() noexcept -> iterator { return polynomials_.end(); }
+  auto end() const noexcept -> const_iterator { return polynomials_.end(); }
 
   // NOLINTNEXTLINE(hicpp-explicit-conversions)
   operator View() noexcept { return {polynomials_.data(), polynomials_.size()}; }
@@ -202,8 +207,16 @@ class PolynomialProduct {
   operator ConstView() const noexcept { return {polynomials_.data(), polynomials_.size()}; }
 
  private:
-  small_vector<PolynomialType> polynomials_;
+  polynomials_vector polynomials_;
 };
 }  // namespace poly
+
+namespace boost {
+template <class Poly, std::size_t N>
+struct range_iterator<poly::PolynomialProduct<Poly, N>> {
+  using type = typename poly::PolynomialProduct<Poly, N>::iterator;
+};
+
+}  // namespace boost
 
 #endif  // SRC_POLYNOMIALS_TENSOR_PRODUCT_HPP_

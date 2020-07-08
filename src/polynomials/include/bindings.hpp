@@ -540,10 +540,18 @@ auto bind_number(py::module& m, const char* name) -> py::class_<Real> {
                })
           .def("__str__",
                [](Real const& self) { return py::str("{}").format(static_cast<FP>(self)); })
-          .def("__format__", [](Real const& self, py::str const& format_spec) {
-            // either cast to long double and lose precision or rewrite the format parser...
-            return py::cast(static_cast<FP>(self)).attr("__format__")(format_spec);
-          });
+          .def("__format__",
+               [](Real const& self, py::str const& format_spec) {
+                 // either cast to long double and lose precision or rewrite the format parser...
+                 return py::cast(static_cast<FP>(self)).attr("__format__")(format_spec);
+               })
+          .def(py::pickle(
+              [](Real const& self) {
+                std::ostringstream ss;
+                ss << self;
+                return ss.str();
+              },
+              [](std::string const& str) { return Real(str); }));
 
   py::implicitly_convertible<long double, Real>();
   py::implicitly_convertible<double, Real>();
@@ -570,7 +578,9 @@ auto bind_polynomial(py::module& m, const char* name) -> py::class_<T> {
       py::class_<T>(m, name)
           .def(py::init<OrderType>(), py::doc("Initialize polynomial with a specified order"))
           .def_property("order", py::overload_cast<>(&T::order, py::const_),
-                        py::overload_cast<OrderType>(&T::order), "Order of the polynomial");
+                        py::overload_cast<OrderType>(&T::order), "Order of the polynomial")
+          .def(py::pickle([](T const& self) { return self.order(); },
+                          [](OrderType const& order) { return T(order); }));
 
   def_copy_ctor(klass);
 
@@ -661,9 +671,22 @@ auto bind_polynomial_series(py::module& m, const char* name) -> py::class_<T> {
           .def(py::init<OrderType>())
           .def("__len__", &T::size)
           .def("__getitem__", py::overload_cast<std::size_t>(&T::at))
-          .def("__setitem__", [](T& self, std::size_t index, typename T::Real coefficient) {
-            self.at(index) = coefficient;
-          });
+          .def("__setitem__", [](T& self, std::size_t index,
+                                 typename T::Real coefficient) { self.at(index) = coefficient; })
+          .def(py::pickle(
+              [](T const& self) {
+                auto const coefficients = self.coefficients();
+                py::tuple tuple(coefficients.size());
+                for (auto&& [index, coefficient] : coefficients | boost::adaptors::indexed())
+                  tuple[index] = coefficient;
+                return tuple;
+              },
+              [](py::tuple const& tuple) {
+                T series(narrow<OrderType>(tuple.size()));
+                std::size_t index = 0;
+                for (auto&& item : tuple) series[index++] = item.cast<Real>();
+                return series;
+              }));
 
   def_copy_ctor(klass);
   def_ranged_init<1>(
@@ -822,7 +845,22 @@ auto bind_polynomial_product(py::module& m, const char* name) -> py::class_<T> {
           .def("clear", [](T& self) { self.clear(); })
           .def("resize", [](T& self, std::size_t size) { self.resize(size); })
           .def_property_readonly(
-              "polynomials", [](T& self) { return self.polynomials(); }, py::keep_alive<0, 1>{});
+              "polynomials", [](T& self) { return self.polynomials(); }, py::keep_alive<0, 1>{})
+          .def(py::pickle(
+              [](T const& self) {
+                py::tuple tuple(self.dimensions());
+                for (auto&& [index, order] : self | boost::adaptors::indexed())
+                  tuple[index] = order;
+
+                return tuple;
+              },
+              [](py::tuple const& tuple) {
+                T product(narrow<OrderType>(tuple.size()));
+                std::size_t index = 0;
+                for (auto&& item : tuple) product[index++].order(item.cast<OrderType>());
+
+                return product;
+              }));
 
   def_ranged_init<1>(
       klass, [](auto const& orders) { return std::make_unique<T>(orders); }, integral_arrays);
@@ -871,7 +909,32 @@ auto bind_polynomial_product_set(py::module& m, const char* name) -> py::class_<
                  self.assign(strided_view<OrderType const>(orders.data(), orders.size(),
                                                            orders.strides()[0]),
                              orders.shape()[1]);
-               });
+               })
+          .def(py::pickle(
+              [](T const& self) {
+                return py::make_tuple(self.dimensions(), self.size(),
+                                      detail::to_vector(self.polynomials()),
+                                      detail::to_vector(self.coefficients()));
+              },
+              [](py::tuple const& tuple) {
+                if (tuple.size() != 4) throw std::runtime_error("Invalid state!");
+
+                T set(tuple[1].cast<std::size_t>(), tuple[0].cast<std::size_t>());
+                auto&& polys = tuple[2].cast<py::sequence>();
+                auto&& coefficients = tuple[3].cast<py::sequence>();
+
+                if (py::len(polys) != set.index_count())
+                  throw std::runtime_error("Invalid polynomials state!");
+                for (auto&& [index, poly] : set.polynomials() | boost::adaptors::indexed())
+                  poly = polys[index].template cast<PolynomialType>();
+
+                if (py::len(coefficients) != set.size())
+                  throw std::runtime_error("Invalid coefficients state!");
+                for (auto&& [index, coefficient] : set.coefficients() | boost::adaptors::indexed())
+                  coefficient = coefficients[index].template cast<Real>();
+
+                return set;
+              }));
 
   def_ranged_static(
       klass, "full_set", [](auto const& range) { return T::full_set(range); }, integral_arrays);
@@ -973,7 +1036,20 @@ auto bind_sobol(py::module& m, const char* name) -> py::class_<Sobol<Real>> {
                })
           .def("total_sensitivity", py::vectorize([](T const* self, std::size_t index) {
                  return static_cast<FP>(self->total_sensitivity(index, check_bounds));
-               }));
+               }))
+          .def(py::pickle(
+              [](T const& self) {
+                return py::make_tuple(self.dimensions(), detail::to_vector(self.indices()),
+                                      detail::to_vector(self.coefficients()));
+              },
+              [](py::tuple const& tuple) {
+                if (tuple.size() != 3) throw std::runtime_error("Invalid state!");
+
+                T sobol(tuple[1].cast<typename T::indices_vector>(),
+                        tuple[2].cast<typename T::coefficients_vector>(),
+                        tuple[0].cast<std::size_t>());
+                return sobol;
+              }));
 
   def_ranged_2d<T const, std::size_t>(
       klass, "sensitivity",
