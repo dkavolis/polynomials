@@ -30,7 +30,7 @@ def get_include_dir():
 
 
 def all_cpp():
-    import polynomials_cpp as cpp
+    from . import polynomials_cpp as cpp
 
     return [i for i in dir(cpp) if not i.startswith("_")]
 
