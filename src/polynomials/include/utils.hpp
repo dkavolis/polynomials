@@ -328,19 +328,27 @@ void reflect_in_place(std::vector<T>& vector, bool has_zero) {
   }
 }
 
-template <class T, std::size_t N>
-auto to_vector(std::array<T, N> const& a) -> std::vector<T> {
-  return std::vector<T>{a.begin(), a.end()};
+template <class T, std::size_t N, class Alloc = std::allocator<T>>
+auto to_vector(std::array<T, N> const& a, Alloc const& allocator = Alloc())
+    -> std::vector<T, Alloc> {
+  return std::vector<T>{a.begin(), a.end(), allocator};
 }
 
-template <typename T>
-auto to_vector(std::vector<T> const& a) -> std::vector<T> {
-  return a;
+template <typename T, class Allocator, class Alloc = Allocator>
+auto to_vector(std::vector<T, Allocator> const& a, Alloc const& allocator = Alloc())
+    -> std::vector<T, Alloc> {
+  return {a, allocator};
 }
 
-template <class T>
-auto to_vector(view<T const> items) -> std::vector<T> {
-  return std::vector<T>{items.begin(), items.end()};
+template <class T, class Alloc = std::allocator<T>>
+auto to_vector(view<T const> items, Alloc const& allocator = Alloc()) -> std::vector<T, Alloc> {
+  return std::vector<T>{items.begin(), items.end(), allocator};
+}
+
+template <class T, class Alloc = std::allocator<T>>
+auto to_vector(strided_view<T const> items, Alloc const& allocator = Alloc())
+    -> std::vector<T, Alloc> {
+  return std::vector<T>{items.begin(), items.end(), allocator};
 }
 
 }  // namespace detail
