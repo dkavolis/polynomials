@@ -32,11 +32,24 @@ class PCEMeta(type):
     def make_pce(self, size: int, dimensions: int):
         return self._TENSOR_TYPE(size=size, dimensions=dimensions)
 
+    def make_full_set(self, orders: Tuple[int]):
+        return self._TENSOR_TYPE.full_set(orders)
+
 
 class PCEBase(metaclass=PCEMeta, is_abstract=True):
-    def __init__(self, linear_model, dimensions: int, components: int = 0):
+    def __init__(
+        self,
+        linear_model,
+        dimensions: int = 0,
+        components: int = 0,
+        full_set: Tuple[int] = None,
+    ):
         self.linear_model = linear_model
-        self._pce = type(self).make_pce(size=components, dimensions=dimensions)
+
+        if full_set is None:
+            self._pce = type(self).make_pce(size=components, dimensions=dimensions)
+        else:
+            self._pce = type(self).make_full_set(full_set)
         self._sobol: Sobol = None
 
     def __iter__(self):
