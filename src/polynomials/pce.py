@@ -145,6 +145,17 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         return coefficients
 
+    def set_target_coefficients(self, target: int, coefficients: np.ndarray) -> None:
+        self.linear_model.coef_[target, :] = coefficients
+
+        if self.linear_model.fit_intercept:
+            try:
+                index = self._pce.index([0] * self.dimensions)
+                self.linear_model.intercept_[target] = coefficients[index]
+                self.linear_model.coef_[target, index] = 0
+            except IndexError:
+                pass
+
     def predict(
         self, x: np.ndarray, targets: Union[int, Sequence[int]] = 0
     ) -> np.ndarray:
