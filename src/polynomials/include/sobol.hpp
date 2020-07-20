@@ -161,6 +161,9 @@ class Sobol {
   using View = SobolItemView<Real, std::size_t>;
   using ConstView = SobolItemView<Real const, std::size_t const>;
 
+  using iterator = SobolIterator<Real const>;
+  using const_iterator = iterator;
+
   Sobol(indices_vector indices, coefficients_vector coefficients, std::size_t dimensions)
       : indices_(std::move(indices)),
         coefficients_(std::move(coefficients)),
@@ -313,5 +316,7 @@ class Sobol {
   }
 };
 }  // namespace poly
+
+POLY_TEMPLATE_RANGE(poly::Sobol)
 
 #endif  // SRC_POLYNOMIALS_SOBOL_HPP_

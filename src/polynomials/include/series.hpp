@@ -65,6 +65,9 @@ class PolynomialSeries {
     }
   }
 
+  auto coefficients() noexcept -> view<Real> {
+    return {coefficients_.data(), coefficients_.size()};
+  }
   [[nodiscard]] auto coefficients() const noexcept -> view<Real const> {
     return {coefficients_.data(), coefficients_.size()};
   }

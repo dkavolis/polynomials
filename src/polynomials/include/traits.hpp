@@ -87,6 +87,9 @@ struct is_range : std::false_type {};
 template <typename T>
 struct is_range<T, std::void_t<typename boost::range_iterator<T>::type>> : std::true_type {};
 
+template <typename T>
+struct is_range<T const, std::void_t<typename boost::range_iterator<T>::type>> : std::true_type {};
+
 }  // namespace detail
 
 template <typename Impl>

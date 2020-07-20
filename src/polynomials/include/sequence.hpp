@@ -105,6 +105,7 @@ class SequenceRange {
   using OrderType = typename Traits::OrderType;
   using Real = typename Traits::Real;
   using iterator = detail::PolynomialSequenceIterator<typename Polynomial::Base, Traits>;
+  using const_iterator = iterator;
 
   SequenceRange(OrderType end, Real x) noexcept : end_(end), x_(std::move(x)) {}
 
@@ -130,16 +131,6 @@ auto polynomial_sequence(typename T::Traits::OrderType end_order, typename T::Tr
 
 }  // namespace poly
 
-namespace boost {
-template <class T>
-struct range_iterator<poly::SequenceRange<T>> {
-  using type = typename poly::SequenceRange<T>::iterator;
-};
-
-template <class T>
-struct range_iterator<poly::SequenceRange<T> const> {
-  using type = typename poly::SequenceRange<T>::iterator;
-};
-}
+POLY_TEMPLATE_RANGE(poly::SequenceRange)
 
 #endif  // SRC_POLYNOMIALS_SEQUENCE_HPP_

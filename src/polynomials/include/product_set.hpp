@@ -397,4 +397,6 @@ class PolynomialProductSetIterator : public boost::iterator_facade<
 
 }  // namespace poly
 
+POLY_TEMPLATE_RANGE(poly::PolynomialProductSet)
+
 #endif  // SRC_POLYNOMIALS_TENSOR_PRODUCT_SET_HPP_

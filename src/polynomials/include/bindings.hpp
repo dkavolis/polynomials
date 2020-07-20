@@ -121,6 +121,89 @@ auto to_range(py::array_t<T>& array, ssize_t dimension = 0) -> strided_view<T> {
   return {array.mutable_data(), narrow_cast<std::size_t>(count), stride};
 }
 
+constexpr auto value_caster = [](auto&& value) { return py::str(py::cast(value)); };
+
+template <class Range, class F = decltype(value_caster),
+          typename = std::enable_if_t<detail::is_range<Range>::value>>
+class RangeFormatter {
+ public:
+  constexpr explicit RangeFormatter(Range& range, const char* sep = ", ",
+                                    F format = value_caster) noexcept
+      : range_(range), sep_(sep), format_(std::move(format)) {}
+
+  friend auto operator<<(std::ostream& os, RangeFormatter const& range) -> std::ostream& {
+    os << "[";
+    auto begin = boost::begin(range.range_);
+    auto&& end = boost::end(range.range_);
+    for (;;) {
+      os << range.format_(*begin);
+      ++begin;
+      if (begin == end) {
+        os << "]";
+        break;
+      }
+      os << range.sep_;
+    }
+
+    return os;
+  }
+
+ private:
+  Range& range_;
+  const char* sep_;
+  F format_;
+};
+
+template <class T, class F>
+class CustomFormatter {
+ public:
+  constexpr explicit CustomFormatter(T& item, F format) noexcept
+      : item_(item), format_(std::move(format)) {}
+
+  friend auto operator<<(std::ostream& os, CustomFormatter const& self) -> std::ostream& {
+    self.format_(os, self.item_);
+    return os;
+  }
+
+ private:
+  T& item_;
+  F format_;
+};
+
+template <class F = decltype(value_caster)>
+constexpr auto make_range_stream(const char* sep = ", ", F format = value_caster) {
+  return [sep, format = std::move(format)](auto&& range) {
+    return RangeFormatter<std::remove_reference_t<decltype(range)>, F>(range, sep, format);
+  };
+};
+
+template <class F>
+constexpr auto make_value_stream(F format) {
+  return [format = std::move(format)](auto&& value) {
+    return CustomFormatter<std::remove_reference_t<decltype(value)>, F>(value, format);
+  };
+}
+
+constexpr auto range_stream = make_range_stream();
+constexpr auto value_stream = value_caster;
+
+template <class T, class F = decltype(value_stream), class... Options>
+void def_repr_str(py::class_<T, Options...>& klass, std::string name,
+                  F const& make_stream = value_stream) {
+  klass
+      .def("__repr__",
+           [name = std::move(name), make_stream](T const& self) {
+             std::ostringstream ss;
+             ss << name << "(" << make_stream(self) << ")";
+             return ss.str();
+           })
+      .def("__str__", [make_stream](T const& self) {
+        std::ostringstream ss;
+        ss << make_stream(self);
+        return ss.str();
+      });
+}
+
 template <class T>
 struct identity {
   using type = T;
@@ -390,16 +473,20 @@ template <class T>
 struct is_bufferable<T, std::void_t<decltype(py::format_descriptor<T>::format())>>
     : std::true_type {};
 
-template <class T>
-auto bind_view(py::module& m, const char* name) -> py::class_<T> {
+template <class T, class F = decltype(range_stream)>
+auto bind_view(py::module& m, const char* name, F const& format = range_stream) -> py::class_<T> {
   using value_type = typename T::value_type;
 
+  std::string name_ = name;
+  name_ += "View";
   auto klass =
-      py::class_<T>(m, name)
+      py::class_<T>(m, name_.c_str())
           .def("__getitem__", py::overload_cast<std::size_t>(&T::at, py::const_))
           .def(
               "__iter__", [](T& self) { return py::make_iterator(self); }, py::keep_alive<0, 1>{})
           .def("__len__", &T::size);
+
+  def_repr_str(klass, std::move(name_), format);
 
   if constexpr (!std::is_const_v<value_type>)
     klass.def("__setitem__", [](T& self, std::size_t index, value_type value) {
@@ -580,13 +667,18 @@ auto bind_polynomial(py::module& m, const char* name) -> py::class_<T> {
           .def_property("order", py::overload_cast<>(&T::order, py::const_),
                         py::overload_cast<OrderType>(&T::order), "Order of the polynomial")
           .def(py::pickle([](T const& self) { return self.order(); },
-                          [](OrderType const& order) { return T(order); }));
+                          [](OrderType const& order) { return T(order); }))
+          .def("__repr__",
+               [name = std::string(name)](T const& self) {
+                 return py::str("{}({})").format(name, self.order());
+               })
+          .def("__str__", [](T const& self) { return py::str("{}").format(self.order()); });
 
   def_copy_ctor(klass);
 
-  // pybind11 def_property_readonly_static does not work... it assumes the static method is actually
-  // a class method...
-  klass.def_static("domain", &T::domain, py::doc("Abscissa range of the polynomial"));
+  klass.def_property_readonly_static(
+      "domain", [](py::object /* unused */) { return T::domain(); },
+      py::doc("Abscissa range of the polynomial"));
 
   if constexpr (Traits::has_eval) {
     constexpr const char* EvalDocstring =
@@ -688,6 +780,10 @@ auto bind_polynomial_series(py::module& m, const char* name) -> py::class_<T> {
                 return series;
               }));
 
+  def_repr_str(klass, name, make_value_stream([](std::ostream& os, T const& self) -> std::ostream& {
+                 return os << range_stream(self.coefficients());
+               }));
+
   def_copy_ctor(klass);
   def_ranged_init<1>(
       klass, [](auto const& range) { return std::make_unique<T>(range); }, integral_arrays);
@@ -754,7 +850,14 @@ auto bind_polynomial_sequence(py::module& m, const char* name) {
                        [](Sequence& self, Real x) { self.x() = std::move(x); })
                    .def_property(
                        "order", [](Sequence const& self) { return self.order(); },
-                       [](Sequence& self, OrderType order) { self.order() = std::move(order); });
+                       [](Sequence& self, OrderType order) { self.order() = std::move(order); })
+                   .def("__repr__",
+                        [name = std::string(name)](Sequence const& self) {
+                          return py::str("{}({}, {})").format(name, self.order(), self.x());
+                        })
+                   .def("__str__", [](Sequence const& self) {
+                     return py::str("[{}, {}]").format(self.order(), self.x());
+                   });
 
   def_copy_ctor(klass);
   return klass;
@@ -765,7 +868,17 @@ auto bind_product_view(py::module& m, const char* name) -> py::class_<T> {
   using Real = typename T::Real;
   using FP = mapped_float_t<Real>;
   using OrderType = typename T::OrderType;
-  auto klass = bind_view<T>(m, name);
+  std::optional<py::class_<T>> klass_;
+  if constexpr (detail::has_coefficient_member<T>::value)
+    klass_ = bind_view<T>(
+        m, name, make_value_stream([](std::ostream& os, T const& self) -> std::ostream& {
+          os << "(" << range_stream(self) << ", " << value_stream(self.coefficient()) << ")";
+          return os;
+        }));
+  else
+    klass_ = bind_view<T>(m, name);
+
+  auto klass = klass_.value();
 
   klass
       .def("matches_orders",
@@ -862,6 +975,8 @@ auto bind_polynomial_product(py::module& m, const char* name) -> py::class_<T> {
                 return product;
               }));
 
+  def_repr_str(klass, name, range_stream);
+
   def_ranged_init<1>(
       klass, [](auto const& orders) { return std::make_unique<T>(orders); }, integral_arrays);
   def_ranged_2d<T const, FP>(
@@ -891,6 +1006,8 @@ auto bind_polynomial_product_set(py::module& m, const char* name) -> py::class_<
           .def_property("dimensions", py::overload_cast<>(&T::dimensions, py::const_),
                         py::overload_cast<std::size_t>(&T::dimensions))
           .def_property_readonly("index_count", &T::index_count)
+          .def_property_readonly("coefficients", py::overload_cast<>(&T::coefficients),
+                                 py::keep_alive<0, 1>{})
           .def(
               "__iter__", [](T& self) { return py::make_iterator(self); }, py::keep_alive<0, 1>{})
           .def("__getitem__", py::overload_cast<std::size_t>(&T::at), py::keep_alive<0, 1>{})
@@ -936,6 +1053,14 @@ auto bind_polynomial_product_set(py::module& m, const char* name) -> py::class_<
                 return set;
               }));
 
+  def_repr_str(klass, name, make_range_stream("\n", [](auto&& subrange) {
+                 return make_value_stream([](std::ostream& os, auto&& subrange) -> std::ostream& {
+                   os << "[" << range_stream(subrange) << ", "
+                      << value_stream(subrange.coefficient()) << "]";
+                   return os;
+                 })(subrange);
+               }));
+
   def_ranged_static(
       klass, "full_set", [](auto const& range) { return T::full_set(range); }, integral_arrays);
 
@@ -964,7 +1089,11 @@ auto bind_polynomial_product_set(py::module& m, const char* name) -> py::class_<
 template <class T>
 auto bind_sobol_view(py::module& m, const char* name) -> py::class_<T> {
   using Real = typename T::Real;
-  auto klass = bind_view<T>(m, name);
+  auto klass = bind_view<T>(
+      m, name, make_value_stream([](std::ostream& os, T const& self) -> std::ostream& {
+        os << "(" << range_stream(self) << ", " << value_stream(self.coefficient()) << ")";
+        return os;
+      }));
 
   if constexpr (std::is_const_v<Real>)
     klass.def_property_readonly("coefficient", [](T const& self) { return self.coefficient(); });
@@ -1050,6 +1179,14 @@ auto bind_sobol(py::module& m, const char* name) -> py::class_<Sobol<Real>> {
                         tuple[0].cast<std::size_t>());
                 return sobol;
               }));
+
+  def_repr_str(klass, name, make_range_stream("\n", [](auto&& subrange) {
+                 return make_value_stream([](std::ostream& os, auto&& subrange) -> std::ostream& {
+                   os << "[" << range_stream(subrange) << ", "
+                      << value_stream(subrange.coefficient()) << "]";
+                   return os;
+                 })(subrange);
+               }));
 
   def_ranged_2d<T const, std::size_t>(
       klass, "sensitivity",

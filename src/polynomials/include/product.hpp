@@ -211,12 +211,6 @@ class PolynomialProduct {
 };
 }  // namespace poly
 
-namespace boost {
-template <class Poly, std::size_t N>
-struct range_iterator<poly::PolynomialProduct<Poly, N>> {
-  using type = typename poly::PolynomialProduct<Poly, N>::iterator;
-};
-
-}  // namespace boost
+POLY_TEMPLATE_RANGE(poly::PolynomialProduct)
 
 #endif  // SRC_POLYNOMIALS_TENSOR_PRODUCT_HPP_

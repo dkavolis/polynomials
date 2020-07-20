@@ -81,4 +81,18 @@ constexpr static inline narrowing_check<false> no_narrowing_check{};
 
 }  // namespace poly
 
+#define POLY_TEMPLATE_RANGE(tmp)                                         \
+  namespace boost {                                                      \
+  template <class... T>                                                  \
+  struct range_iterator<tmp<T...>> {                 \
+    using type = typename tmp<T...>::iterator;       \
+  };                                                                     \
+                                                                         \
+  template <class... T>                                                  \
+  struct range_iterator<tmp<T...> const> {           \
+    using type = typename tmp<T...>::const_iterator; \
+  };                                                                     \
+                                                                         \
+  }  // namespace boost
+
 #endif  // SRC_POLYNOMIALS_CONFIG_HPP_

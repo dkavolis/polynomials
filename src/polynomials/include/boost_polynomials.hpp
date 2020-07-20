@@ -202,7 +202,11 @@ struct LegendreStieltjesImpl {
 
   static auto eval(Storage const& item, Real x) -> Real { return item.polynomial(x); }
   static auto prime(Storage const& item, Real x) -> Real { return item.polynomial.prime(x); }
-  static auto zeros(Storage const& item) -> std::vector<Real> { return item.polynomial.zeros(); }
+  static auto zeros(Storage const& item) -> std::vector<Real> {
+    auto vector = item.polynomial.zeros();
+    detail::reflect_in_place<detail::Reflection::Odd>(vector, vector[0] == 0);
+    return vector;
+  }
   static auto domain() -> std::pair<Real, Real> { return {-1, 1}; }
 };
 
