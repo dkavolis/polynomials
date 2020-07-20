@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Sequence, Type, Union, cast
+from typing import TYPE_CHECKING, Callable, Sequence, Type, Union
 
 import numpy as np
 
@@ -131,34 +131,77 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         return X
 
-    def target_pce(self, index: int):
-        coefficients = np.asarray(self.linear_model.coef_)[index, :]
-        intercept = None
+    def target_coefficients(self, target: int) -> np.ndarray:
+        coefficients = np.array(self.linear_model.coef_[target, :], copy=True)
+
         if self.linear_model.fit_intercept:
-            intercept = self.linear_model.intercept_
+            intercept = self.linear_model.intercept_[target]
+            if intercept != 0:
+                try:
+                    index = self._pce.index([0] * self.dimensions)
+                    coefficients[index] = intercept
+                except IndexError:
+                    pass
 
-        copy = type(self)(linear_model=self.linear_model, dimensions=0, components=0)
-        # use copy constructor
-        copy._pce = type(self._pce).__init__(self._pce)
-        self._set_coefficients(copy._pce, coefficients, intercept)
+        return coefficients
 
-        return copy
+    def predict(
+        self, x: np.ndarray, targets: Union[int, Sequence[int]] = 0
+    ) -> np.ndarray:
+        def f(*args, **kwargs):
+            return self._pce(*args, **kwargs)
 
-    def predict(self, x):
-        return self._pce(x)
+        return self._eval_targets(targets, f, x)
 
-    def sensitivity(self, indices: Union[int, Sequence[int]]) -> Real:
-        return self.sobol.sensitivity(indices)
+    def sensitivity(
+        self, indices: Union[int, Sequence[int]], targets: Union[int, Sequence[int]] = 0
+    ) -> Union[Real, np.ndarray]:
+        def f(*args, **kwargs):
+            return self._pce.sobol().sensitivity(*args, **kwargs)
 
-    def total_sensitivity(self, index: int) -> Real:
-        return self.sobol.total_sensitivity(index)
+        return self._eval_targets(targets, f, indices)
 
-    def total_sensitivities(self) -> np.ndarray:
-        sensitivities = np.zeros(self.dimensions, dtype=np.double)
-        for i in range(self.dimensions):
-            sensitivities[i] = self.total_sensitivity(i)
+    def total_sensitivity(
+        self, indices: Union[int, Sequence[int]], targets: Union[int, Sequence[int]] = 0
+    ) -> Union[Real, np.ndarray]:
+        def f(*args, **kwargs):
+            return self._pce.sobol().total_sensitivity(*args, **kwargs)
 
-        return sensitivities
+        return self._eval_targets(targets, f, indices)
+
+    def total_sensitivities(self, targets: Union[int, Sequence[int]] = 0) -> np.ndarray:
+        return self.total_sensitivity(np.arange(self.dimensions), targets)
+
+    def _eval_targets(
+        self, targets: Union[int, Sequence[int]], function: Callable, *args, **kwargs
+    ):
+
+        if isinstance(targets, int):
+            if targets < 0:
+                if self.linear_model.coef_.ndim == 2:
+                    n_targets = self.linear_model.coef_.shape[0]
+                else:
+                    n_targets = 1
+                targets = list(range(n_targets))
+            else:
+                targets = [targets]
+        else:
+            targets = list(targets)
+
+        if n_targets == 1 or (len(targets) == 1 and targets[0] == 0):
+            return function(*args, **kwargs)
+
+        y = []
+        try:
+            for i in targets:
+                self._pce.assign_coefficients(self.target_coefficients(i))
+                y.append(function(*args, **kwargs))
+        finally:
+            self._pce.assign_coefficients(self.target_coefficients(0))
+
+        if len(targets) == 1:
+            return y[0]
+        return np.asarray(y)
 
     @property
     def coefficients(self) -> np.ndarray:
@@ -198,9 +241,79 @@ class LegendreStieltjesPCE(PCEBase, tensor_type=LegendreStieltjesProductSet):
 
 
 def fit_improvement(
-    sensitivities: np.ndarray, previous_sensitivities: np.ndarray
+    sensitivities: np.ndarray,
+    previous_sensitivities: np.ndarray,
+    axis: int = None,
+    out: np.ndarray = None,
 ) -> float:
     sensitivities = np.asarray(sensitivities)
     previous_sensitivities = np.asarray(previous_sensitivities)
     differences = np.abs(sensitivities - previous_sensitivities)
-    return cast(float, np.mean(differences))
+    return np.mean(differences, axis=axis, out=out)
+
+
+class AdaptivePCE:
+    def __init__(self, pce: PCEBase, tolerance: float, targets: int = 1):
+        self.pce = pce
+        self._sensitivities = np.zeros([pce.dimensions, targets], dtype=np.double)
+        self._errors = np.ones([targets]) * np.inf
+        self.tolerance = tolerance
+        self._x: np.ndarray = np.zeros([0])
+        self._y: np.ndarray = np.zeros([0])
+
+    @property
+    def sample_count(self) -> int:
+        return len(self._x)
+
+    @property
+    def targets(self) -> int:
+        return len(self._errors)
+
+    @property
+    def errors(self) -> np.ndarray:
+        return self._errors
+
+    @property
+    def converged(self) -> bool:
+        return np.all(self._errors <= self.tolerance)
+
+    def fit(self, x, y) -> bool:
+        y = np.asarray(y)
+        targets = 1
+        if y.ndim > 1:
+            targets = y.shape[1]
+        self._sensitivities = np.zeros([self.pce.dimensions, targets])
+        return self.improve(x, y)
+
+    def update_convergence(self) -> bool:
+        sensitivities = self.pce.total_sensitivities(-1)
+        self._errors = fit_improvement(sensitivities, self._sensitivities, axis=1)
+        self._sensitivities = sensitivities
+        return self.converged
+
+    def improve(self, x, y, update_convergence: bool = True) -> bool:
+        x = np.asarray(x)
+        y = np.asarray(y)
+
+        self.pce.fit(x, y)
+
+        self._x = x
+        self._y = y
+
+        if update_convergence:
+            return self.update_convergence()
+        return self.converged
+
+    def improve_extend(self, x, y, update_convergence: bool = True) -> bool:
+        if self._x.size == 0:
+            x = np.array(x, copy=True)
+            y = np.array(y, copy=True)
+        else:
+            x = np.vstack((self._x, x))
+            y = np.vstack((self._y, y))
+        return self.improve(x, y, update_convergence)
+
+    def predict(
+        self, x: np.ndarray, targets: Union[int, Sequence[int]] = -1
+    ) -> np.ndarray:
+        return self.pce.predict(x, targets)

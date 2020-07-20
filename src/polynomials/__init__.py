@@ -20,6 +20,7 @@ from .pce import (  # noqa: F401
     HermitePCE,
     LegendreStieltjesPCE,
     fit_improvement,
+    AdaptivePCE,
 )
 
 
@@ -43,6 +44,7 @@ __all__ = [
     "LegendreStieltjesPCE",
     "fit_improvement",
     "get_include_dir",
+    "AdaptivePCE",
 ] + all_cpp()
 
 del all_cpp
