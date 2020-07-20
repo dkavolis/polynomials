@@ -147,11 +147,19 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
     def set_target_coefficients(self, target: int, coefficients: np.ndarray) -> None:
         self.linear_model.coef_[target, :] = coefficients
+        self._fixup_intercept(target)
 
+    def add_target_coefficients(self, target: int, delta: np.ndarray) -> None:
+        self.linear_model.coef_[target, :] += delta
+        self._fixup_intercept(target)
+
+    def _fixup_intercept(self, target: int) -> None:
         if self.linear_model.fit_intercept:
             try:
                 index = self._pce.index([0] * self.dimensions)
-                self.linear_model.intercept_[target] = coefficients[index]
+                self.linear_model.intercept_[target] = self.linear_model.coef_[
+                    target, index
+                ]
                 self.linear_model.coef_[target, index] = 0
             except IndexError:
                 pass
