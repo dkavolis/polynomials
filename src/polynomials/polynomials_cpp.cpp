@@ -31,7 +31,7 @@
 PYBIND11_MODULE(polynomials_cpp, m) {
   m.def_submodule("views", "Internal submodule for bound view types");
 
-  poly::bind_number<poly::Quad>(m, "Real");
+  // poly::bind_number<poly::Quad>(m, "Real");
 
   poly::bind_all_polynomials<poly::LegendreImpl<poly::Quad>>(m, "Legendre");
   poly::bind_all_polynomials<poly::LaguerreImpl<poly::Quad>>(m, "Laguerre");

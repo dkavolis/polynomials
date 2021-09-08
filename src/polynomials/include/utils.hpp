@@ -36,6 +36,7 @@
 #include "config.hpp"
 
 MSVC_WARNING_DISABLE(4619)
+#include <boost/container_hash/hash.hpp>
 #include <boost/range/adaptor/indexed.hpp>
 #include <boost/tuple/tuple.hpp>
 MSVC_WARNING_POP()

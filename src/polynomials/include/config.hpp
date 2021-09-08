@@ -28,8 +28,6 @@
 #ifndef SRC_POLYNOMIALS_CONFIG_HPP_
 #define SRC_POLYNOMIALS_CONFIG_HPP_
 
-#include <boost/multiprecision/cpp_bin_float.hpp>
-
 #ifndef POLY_HEADER_ONLY
 #  define POLY_HEADER_ONLY 1
 #endif
@@ -63,8 +61,12 @@
 #  define MSVC_WARNING_POP()
 #endif
 
+#include <type_traits>
+// #include <boost/multiprecision/cpp_bin_float.hpp>
+
 namespace poly {
-using Quad = boost::multiprecision::cpp_bin_float_quad;
+// using Quad = boost::multiprecision::cpp_bin_float_quad;
+using Quad = long double;
 
 constexpr static unsigned QuadraturePoints = 128;
 constexpr static std::size_t SmallStorageSize = 10;

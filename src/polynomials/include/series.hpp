@@ -61,7 +61,7 @@ class PolynomialSeries {
     polynomials_.resize(count);
     for (auto&& [index, coefficient] : coefficients | boost::adaptors::indexed()) {
       polynomials_[index].order(narrow_cast<OrderType>(index));
-      coefficients_[index] = coefficient;
+      coefficients_[index] = static_cast<Real>(coefficient);
     }
   }
 
