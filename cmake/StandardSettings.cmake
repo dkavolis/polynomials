@@ -11,7 +11,7 @@ option(${PROJECT_NAME}_WARNINGS_AS_ERRORS "Treat compiler warnings as errors."
 # Currently supporting: Clang-Tidy, Cppcheck.
 
 option(${PROJECT_NAME}_ENABLE_CLANG_TIDY
-       "Enable static analysis with Clang-Tidy." ON)
+       "Enable static analysis with Clang-Tidy." OFF)
 option(${PROJECT_NAME}_ENABLE_CPPCHECK "Enable static analysis with Cppcheck."
        OFF)
 
