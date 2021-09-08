@@ -66,7 +66,7 @@
 namespace poly {
 using Quad = boost::multiprecision::cpp_bin_float_quad;
 
-constexpr static unsigned QuadraturePoints = 256;
+constexpr static unsigned QuadraturePoints = 128;
 constexpr static std::size_t SmallStorageSize = 10;
 
 template <bool check = false>
@@ -81,18 +81,18 @@ constexpr static inline narrowing_check<false> no_narrowing_check{};
 
 }  // namespace poly
 
-#define POLY_TEMPLATE_RANGE(tmp)                                         \
-  namespace boost {                                                      \
-  template <class... T>                                                  \
+#define POLY_TEMPLATE_RANGE(tmp)                     \
+  namespace boost {                                  \
+  template <class... T>                              \
   struct range_iterator<tmp<T...>> {                 \
     using type = typename tmp<T...>::iterator;       \
-  };                                                                     \
-                                                                         \
-  template <class... T>                                                  \
+  };                                                 \
+                                                     \
+  template <class... T>                              \
   struct range_iterator<tmp<T...> const> {           \
     using type = typename tmp<T...>::const_iterator; \
-  };                                                                     \
-                                                                         \
+  };                                                 \
+                                                     \
   }  // namespace boost
 
 #endif  // SRC_POLYNOMIALS_CONFIG_HPP_
