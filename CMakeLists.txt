@@ -23,16 +23,12 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   )
 endif()
 
-if(MSVC)
-  set(PYBIND11_CPP_STANDARD /std:c++17)
-else()
-  set(PYBIND11_CPP_STANDARD -std=c++17)
-endif()
-
+find_package(Python 3 REQUIRED COMPONENTS Development)
 find_package(pybind11 REQUIRED)
 find_package(Boost REQUIRED)
 
 add_library(polynomials OBJECT src/polynomials/polynomials.cpp)
+target_compile_definitions(polynomials PUBLIC CMAKE_CXX_STANDARD=20)
 target_include_directories(polynomials PUBLIC src/polynomials/include
                                               ${Boost_INCLUDE_DIR})
 target_compile_definitions(polynomials PUBLIC POLY_HEADER_ONLY=0)
@@ -41,7 +37,7 @@ target_compile_definitions(polynomials PUBLIC POLY_HEADER_ONLY=0)
 # Set the project standard and warnings
 #
 
-target_compile_features(polynomials PUBLIC cxx_std_17)
+target_compile_features(polynomials PUBLIC cxx_std_20)
 
 include(cmake/CompilerWarnings.cmake)
 target_set_warnings(polynomials)
