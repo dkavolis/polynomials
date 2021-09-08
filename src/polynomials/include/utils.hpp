@@ -44,28 +44,29 @@ MSVC_WARNING_POP()
 
 // apparently boost tuples cannot be used with structured bindings by default...
 // https://stackoverflow.com/a/55594747/13262469
-namespace std {
-template <typename T, typename U>
-struct tuple_size<boost::tuples::cons<T, U>> : boost::tuples::length<boost::tuples::cons<T, U>> {};
+// namespace std {
+// template <typename T, typename U>
+// struct tuple_size<boost::tuples::cons<T, U>> : boost::tuples::length<boost::tuples::cons<T, U>>
+// {};
 
-template <size_t I, typename T, typename U>
-struct tuple_element<I, boost::tuples::cons<T, U>>
-    : boost::tuples::element<I, boost::tuples::cons<T, U>> {};
+// template <size_t I, typename T, typename U>
+// struct tuple_element<I, boost::tuples::cons<T, U>>
+//     : boost::tuples::element<I, boost::tuples::cons<T, U>> {};
 
-template <typename T, typename Indexable>
-struct tuple_size<boost::range::index_value<T, Indexable>>
-    : std::integral_constant<std::size_t, 2> {};
+// template <typename T, typename Indexable>
+// struct tuple_size<boost::range::index_value<T, Indexable>>
+//     : std::integral_constant<std::size_t, 2> {};
 
-template <typename T, typename Indexable>
-struct tuple_element<0, boost::range::index_value<T, Indexable>> {
-  using type = Indexable;
-};
+// template <typename T, typename Indexable>
+// struct tuple_element<0, boost::range::index_value<T, Indexable>> {
+//   using type = Indexable;
+// };
 
-template <typename T, typename Indexable>
-struct tuple_element<1, boost::range::index_value<T, Indexable>> {
-  using type = T;
-};
-}  // namespace std
+// template <typename T, typename Indexable>
+// struct tuple_element<1, boost::range::index_value<T, Indexable>> {
+//   using type = T;
+// };
+// }  // namespace std
 
 namespace poly {
 
@@ -127,8 +128,6 @@ class strided_iterator : public boost::iterator_facade<strided_iterator<T>, T,
 
  private:
   friend class boost::iterator_core_access;
-  template <class>
-  friend class py_object_iterator;
 
   template <class OtherValue>
   auto equal(strided_iterator<OtherValue> const& other) const -> bool {
@@ -300,7 +299,7 @@ auto hash_range(Range const& range) -> size_t {
   return seed;
 }
 
-enum struct Reflection { Odd, Even };
+enum struct Reflection { None, Odd, Even };
 
 /// \brief boost skips -ve zeros in their polynomials so this function adds the missing values
 /// \tparam type Reflection type: even/odd

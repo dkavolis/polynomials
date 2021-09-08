@@ -47,27 +47,32 @@ namespace detail {
 template <class Real>
 using quadrature_getter = view<Real const> (*)();
 
+template <Reflection Refl, class Container>
+[[nodiscard]] auto full_vector(Container&& points, size_t expected_points [[maybe_unused]])
+    -> decltype(auto) {
+  using Real = std::remove_cvref_t<typename std::remove_cvref_t<Container>::value_type>;
+
+  std::vector<Real> v = to_vector(points);
+  if constexpr (Refl != Reflection::None) {
+    reflect_in_place<Refl>(v, 2 * v.size() > expected_points);
+  }
+
+  return v;
+}
+
 template <class Real, template <class, unsigned> typename Impl, bool Reflect = true>
 struct BaseQuadrature {
   template <unsigned Points>
   static auto weights() -> view<Real const> {
-    static std::vector<Real> items = []() {
-      std::vector<Real> v = detail::to_vector(Impl<Real, Points>::weights());
-      if constexpr (Reflect)
-        detail::reflect_in_place<detail::Reflection::Even>(v, 2 * v.size() > Points);
-      return v;
-    }();
+    static std::vector<Real> items =
+        full_vector<Reflection::Even>(Impl<Real, Points>::weights(), Points);
     return {items.data(), items.size()};
   }
 
   template <unsigned Points>
   static auto abscissa() -> view<Real const> {
-    static std::vector<Real> items = []() {
-      std::vector<Real> v = detail::to_vector(Impl<Real, Points>::abscissa());
-      if constexpr (Reflect)
-        detail::reflect_in_place<detail::Reflection::Odd>(v, 2 * v.size() > Points);
-      return v;
-    }();
+    static std::vector<Real> items =
+        full_vector<Reflection::Odd>(Impl<Real, Points>::abscissa(), Points);
     return {items.data(), items.size()};
   }
 };
