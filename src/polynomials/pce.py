@@ -147,25 +147,35 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
     def set_target_coefficients(self, target: int, coefficients: np.ndarray) -> None:
         self.linear_model.coef_[target, :] = coefficients
-        self._fixup_intercept(target, lambda x: x)
+        self._fixup_intercept(target, lambda _, x: x)
 
     def add_target_coefficients(self, target: int, delta: np.ndarray) -> None:
         self.linear_model.coef_[target, :] += delta
 
-        def add_intercept(value: float) -> float:
-            return self.linear_model.intercept_[target] + value
+        def add_intercept(existing: float, value: float) -> float:
+            return existing + value
 
         self._fixup_intercept(target, add_intercept)
 
-    def _fixup_intercept(self, target: int, update: Callable[[float], float]) -> None:
+    def _fixup_intercept(
+        self, target: int, update: Callable[[float, float], float]
+    ) -> None:
+        intercept = None
         if self.linear_model.fit_intercept:
             try:
                 index = self._pce.index([0] * self.dimensions)
-                intercept = self.linear_model.coef_[target, index]
-                self.linear_model.intercept_[target] = update(intercept)
+                old = self.linear_model.intercept_[target]
+                new = self.linear_model.coef_[target, index]
+                intercept = update(old, new)
+                self.linear_model.intercept_[target] = intercept
                 self.linear_model.coef_[target, index] = 0
             except IndexError:
                 pass
+
+        if target == 0:
+            self._set_coefficients(
+                self._pce, self.linear_model.coef_[target, :], intercept
+            )
 
     def predict(
         self, x: np.ndarray, targets: Union[int, Sequence[int]] = 0
