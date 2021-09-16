@@ -79,7 +79,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             self._sobol = self._pce.sobol()
         return self._sobol
 
-    def fit(self, x, y, X=None) -> np.ndarray:
+    def fit(self, x: np.ndarray, y: np.ndarray, X: np.ndarray = None) -> np.ndarray:
         """
         Fit linear model to PCE
 
@@ -113,7 +113,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         if X is None:
             X = np.ndarray(shape=[n_samples, self.components], dtype=np.double)
             for i, component in enumerate(self._pce):
-                X[:, i] = component(x)
+                X[:, i] = component(x).flatten()
         else:
             X = np.asarray(X)
 
@@ -131,8 +131,16 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         return X
 
-    def target_coefficients(self, target: int) -> np.ndarray:
-        coefficients = np.array(self.linear_model.coef_[target, :], copy=True)
+    def target_coefficients(self, target: int, copy: bool = True) -> np.ndarray:
+        if self.linear_model.coef_.ndim == 2:
+            coefficients = np.array(self.linear_model.coef_[target, :], copy=copy)
+        elif target < 1:
+            coefficients = np.array(self.linear_model.coef_, copy=copy)
+        else:
+            raise ValueError(f"Invalid target, only target 0 exists but got {target}")
+
+        if not copy:
+            return coefficients
 
         if self.linear_model.fit_intercept:
             intercept = self.linear_model.intercept_[target]
@@ -146,11 +154,11 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         return coefficients
 
     def set_target_coefficients(self, target: int, coefficients: np.ndarray) -> None:
-        self.linear_model.coef_[target, :] = coefficients
+        self.target_coefficients(target, False)[:] = coefficients
         self._fixup_intercept(target, lambda _, x: x)
 
     def add_target_coefficients(self, target: int, delta: np.ndarray) -> None:
-        self.linear_model.coef_[target, :] += delta
+        self.target_coefficients(target, False)[:] += delta
 
         def add_intercept(existing: float, value: float) -> float:
             return existing + value
@@ -165,16 +173,16 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             try:
                 index = self._pce.index([0] * self.dimensions)
                 old = self.linear_model.intercept_[target]
-                new = self.linear_model.coef_[target, index]
+                new = self.target_coefficients(target, False)[index]
                 intercept = update(old, new)
                 self.linear_model.intercept_[target] = intercept
-                self.linear_model.coef_[target, index] = 0
+                self.target_coefficients(target, False)[index] = 0
             except IndexError:
                 pass
 
         if target == 0:
             self._set_coefficients(
-                self._pce, self.linear_model.coef_[target, :], intercept
+                self._pce, self.target_coefficients(target, False), intercept
             )
 
     def predict(
@@ -319,11 +327,13 @@ class AdaptivePCE:
 
     def update_convergence(self) -> bool:
         sensitivities = self.pce.total_sensitivities(-1)
-        self._errors = fit_improvement(sensitivities, self._sensitivities, axis=1)
+        self._errors = fit_improvement(sensitivities, self._sensitivities, axis=-1)
         self._sensitivities = sensitivities
         return self.converged
 
-    def improve(self, x, y, update_convergence: bool = True) -> bool:
+    def improve(
+        self, x: np.ndarray, y: np.ndarray, update_convergence: bool = True
+    ) -> bool:
         x = np.asarray(x)
         y = np.asarray(y)
 
@@ -336,7 +346,9 @@ class AdaptivePCE:
             return self.update_convergence()
         return self.converged
 
-    def improve_extend(self, x, y, update_convergence: bool = True) -> bool:
+    def improve_extend(
+        self, x: np.ndarray, y: np.ndarray, update_convergence: bool = True
+    ) -> bool:
         if self._x.size == 0:
             x = np.array(x, copy=True)
             y = np.array(y, copy=True)
