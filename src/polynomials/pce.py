@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Sequence, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Sequence,
+    Type,
+    Union,
+    Protocol,
+    runtime_checkable,
+)
 
 import numpy as np
 
@@ -14,6 +22,19 @@ from .polynomials_cpp import (
 
 if TYPE_CHECKING:
     from .polynomials_cpp import Sobol, Real
+
+
+@runtime_checkable
+class LinearModel(Protocol):
+    coef_: np.ndarray
+    intercept_: Union[float, np.ndarray]
+    fit_intercept: bool
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        ...
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        ...
 
 
 class PCEMeta(type):
@@ -39,7 +60,7 @@ class PCEMeta(type):
 class PCEBase(metaclass=PCEMeta, is_abstract=True):
     def __init__(
         self,
-        linear_model,
+        linear_model: LinearModel,
         dimensions: int = 0,
         components: int = 0,
         full_set: Sequence[int] = None,
