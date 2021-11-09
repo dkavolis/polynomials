@@ -316,8 +316,11 @@ def fit_improvement(
 class AdaptivePCE:
     def __init__(self, pce: PCEBase, tolerance: float, targets: int = 1):
         self.pce = pce
-        self._sensitivities = np.zeros([pce.dimensions, targets], dtype=np.double)
-        self._errors = np.ones([targets]) * np.inf
+        if pce.dimensions == 1:
+            self._sensitivities = np.zeros([targets], dtype=np.double)
+        else:
+            self._sensitivities = np.zeros([pce.dimensions, targets], dtype=np.double)
+        self._errors: np.ndarray = np.ones([targets]) * np.inf
         self.tolerance = tolerance
         self._x: np.ndarray = np.zeros([0])
         self._y: np.ndarray = np.zeros([0])
@@ -335,10 +338,14 @@ class AdaptivePCE:
         return self._errors
 
     @property
+    def sensitivities(self) -> np.ndarray:
+        return self._sensitivities
+
+    @property
     def converged(self) -> bool:
         return np.all(self._errors <= self.tolerance)
 
-    def fit(self, x, y) -> bool:
+    def fit(self, x: np.ndarray, y: np.ndarray) -> bool:
         y = np.asarray(y)
         targets = 1
         if y.ndim > 1:
@@ -347,10 +354,29 @@ class AdaptivePCE:
         return self.improve(x, y)
 
     def update_convergence(self) -> bool:
-        sensitivities = self.pce.total_sensitivities(-1)
-        self._errors = fit_improvement(sensitivities, self._sensitivities, axis=-1)
-        self._sensitivities = sensitivities
+        if self.pce.dimensions == 1:
+            sensitivities = np.array(self.pce.linear_model.coef_)
+
+            if self.pce.linear_model.fit_intercept:
+                sensitivities[:, 0] = self.pce.linear_model.intercept_
+
+            sensitivities = np.linalg.norm(sensitivities, axis=-1)
+
+            self._errors = np.abs(sensitivities - self._sensitivities)
+            self._sensitivities = sensitivities
+        else:
+            sensitivities = self.pce.total_sensitivities(-1)
+
+            self._errors = fit_improvement(sensitivities, self._sensitivities, axis=-1)
+            self._sensitivities = sensitivities
         return self.converged
+
+    def has_converged(self, old_sensitivies: np.ndarray) -> bool:
+        if self.pce.dimensions == 1:
+            errors = np.abs(self._sensitivities - old_sensitivies)
+        else:
+            errors = fit_improvement(self._sensitivities, old_sensitivies, axis=-1)
+        return np.all(errors <= self.tolerance)
 
     def improve(
         self, x: np.ndarray, y: np.ndarray, update_convergence: bool = True
