@@ -8,6 +8,7 @@ from typing import (
     Union,
     Protocol,
     runtime_checkable,
+    Optional,
 )
 
 import numpy as np
@@ -132,30 +133,60 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             raise ValueError("Number of samples and inputs do not match")
 
         if X is None:
-            X = np.ndarray(shape=[n_samples, self.components], dtype=np.double)
+            X = np.ndarray(
+                shape=[n_samples, self.components], dtype=np.double, order="F"
+            )
             for i, component in enumerate(self._pce):
                 X[:, i] = component(x).flatten()
         else:
-            X = np.asarray(X)
+            X = np.asarray(X, order="F")
 
         self.linear_model.fit(X, y)
-        coefficients = np.asarray(self.linear_model.coef_)
-        intercept = self.linear_model.intercept_
-        if coefficients.ndim == 2:
-            coefficients = coefficients[0, :]
-            intercept = intercept[0]
-        if not self.linear_model.fit_intercept:
+        self.sync_with_linear_model(0)
+
+        return X
+
+    def sync_with_linear_model(self, target: Optional[int] = None) -> None:
+        coefficients = np.asanyarray(self.linear_model.coef_)
+
+        if self.linear_model.fit_intercept:
+            intercept = np.asanyarray(self.linear_model.intercept_)
+        else:
             intercept = None
+
+        if target is None:
+            target = 0
+        else:
+            if coefficients.ndim == 2:
+                if target >= len(coefficients):
+                    raise ValueError(
+                        f"target {target} is out of range for {len(coefficients)} targets linear model"
+                    )
+            elif target != 0 and target != -1:
+                raise ValueError(
+                    f"target {target} is out range for single target linear model"
+                )
+
+        if coefficients.ndim == 2:
+            coefficients = coefficients[target, :]
+
+            if self.linear_model.fit_intercept:
+                intercept = intercept[target]
 
         self._set_coefficients(self._pce, coefficients, intercept)
         self._sobol = None
 
-        return X
+    def target_coefficients(
+        self, target: Optional[int], copy: bool = True
+    ) -> np.ndarray:
+        if target is None:
+            s = slice(None)
+        else:
+            s = target
 
-    def target_coefficients(self, target: int, copy: bool = True) -> np.ndarray:
         if self.linear_model.coef_.ndim == 2:
-            coefficients = np.array(self.linear_model.coef_[target, :], copy=copy)
-        elif target < 1:
+            coefficients = np.array(self.linear_model.coef_[s, :], copy=copy)
+        elif target is None or target < 0:
             coefficients = np.array(self.linear_model.coef_, copy=copy)
         else:
             raise ValueError(f"Invalid target, only target 0 exists but got {target}")
@@ -164,13 +195,20 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             return coefficients
 
         if self.linear_model.fit_intercept:
-            intercept = self.linear_model.intercept_[target]
-            if intercept != 0:
-                try:
-                    index = self._pce.index([0] * self.dimensions)
+            try:
+                intercept = self.linear_model.intercept_[s]
+            except IndexError:
+                intercept = self.linear_model.intercept_
+
+            try:
+                index = self._pce.index([0] * self.dimensions)
+            except IndexError:
+                pass
+            else:
+                if coefficients.ndim == 2:
+                    coefficients[s, index] = intercept
+                else:
                     coefficients[index] = intercept
-                except IndexError:
-                    pass
 
         return coefficients
 
