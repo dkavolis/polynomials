@@ -202,6 +202,8 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
             try:
                 index = self._pce.index([0] * self.dimensions)
+                if self.dimensions == 1:
+                    index = index[0]
             except IndexError:
                 pass
             else:
@@ -231,6 +233,8 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         if self.linear_model.fit_intercept:
             try:
                 index = self._pce.index([0] * self.dimensions)
+                if self.dimensions == 1:
+                    index = index[0]
                 old = self.linear_model.intercept_[target]
                 new = self.target_coefficients(target, False)[index]
                 intercept = update(old, new)
