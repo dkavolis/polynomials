@@ -12,18 +12,44 @@
 import os
 import subprocess
 import sys
+from typing import Any, Callable, List, Optional, Tuple
+from typing_extensions import ParamSpec
 from pkg_resources import VersionConflict, require
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
+from mypy import stubgen
+import pathlib
+import shutil
+import functools
 
 
 class CMakeExtension(Extension):
-    def __init__(self, name):
+    def __init__(self, name: str):
         Extension.__init__(self, name, sources=[])
 
 
+P = ParamSpec("P")
+
+
+def path_str(path: pathlib.Path) -> str:
+    return str(path).replace("\\", "/")
+
+
+def stringify(f: Callable[P, Optional[pathlib.Path]]) -> Callable[P, str]:
+    @functools.wraps(f)
+    def wrapped(*args: P.args, **kwargs: P.kwargs) -> str:
+        path = f(*args, **kwargs)
+
+        if path is None:
+            return ""
+
+        return path_str(path)
+
+    return wrapped
+
+
 class CMakeBuild(build_ext):
-    user_options = build_ext.user_options
+    user_options: List[Tuple[str, Any, str]] = build_ext.user_options
     user_options.extend(
         [
             ("cmake-options=", None, "Additional options to pass to cmake"),
@@ -34,7 +60,7 @@ class CMakeBuild(build_ext):
         ]
     )
 
-    def initialize_options(self):
+    def initialize_options(self) -> None:
         super().initialize_options()
         self.cmake_options = ""
         self.vcpkg_dir = ""
@@ -42,7 +68,77 @@ class CMakeBuild(build_ext):
         self.cxx_compiler = ""
         self.cmake_generator = ""
 
-    def run(self):
+    @staticmethod
+    def msvc_compiler() -> Optional[pathlib.Path]:
+        import ctypes
+
+        search_paths = [
+            "C:/Program Files/Microsoft Visual Studio",
+            "C:/Program Files (x86)/Microsoft Visual Studio",
+        ]
+
+        cl_pattern = "**/VC/Tools/MSVC/*/bin/Hostx{0}/x{0}/cl.exe".format(
+            ctypes.sizeof(ctypes.c_void_p) * 8
+        )
+
+        for path in search_paths:
+            for compiler in pathlib.Path(path).glob(cl_pattern):
+                return compiler
+
+        return None
+
+    @staticmethod
+    def _which(name: str) -> Optional[pathlib.Path]:
+        path = shutil.which(name)
+        if path is None:
+            return None
+
+        return pathlib.Path(path)
+
+    @staticmethod
+    def gcc_compiler() -> Optional[pathlib.Path]:
+        return CMakeBuild._which("g++")
+
+    @staticmethod
+    def clang_compiler() -> Optional[pathlib.Path]:
+        return CMakeBuild._which("clang++")
+
+    @staticmethod
+    def clang_cl_compiler() -> Optional[pathlib.Path]:
+        path = pathlib.Path("C:/Program Files/LLVM/bin/clang-cl.exe")
+
+        if not path.exists():
+            return None
+
+        return path
+
+    def _building_msvc(self) -> bool:
+        import platform
+
+        py_compiler = platform.python_compiler()
+        return py_compiler.startswith("MSC")
+
+    @stringify
+    def compiler_path(self) -> Optional[pathlib.Path]:
+        if self.cxx_compiler:
+            return pathlib.Path(self.cxx_compiler)
+
+        if self._building_msvc():
+            # python compiled with MSVC compiler, use windows compilers
+            compiler = self.msvc_compiler()
+            if compiler is not None:
+                return compiler
+
+            return self.clang_cl_compiler()
+
+        compiler = self.gcc_compiler()
+        if compiler is not None:
+            return compiler
+
+        return self.clang_compiler()
+
+    @stringify
+    def cmake_executable(self) -> Optional[pathlib.Path]:
         try:
             subprocess.check_output(["cmake", "--version"])
         except OSError:
@@ -51,8 +147,16 @@ class CMakeBuild(build_ext):
                 + ", ".join(e.name for e in self.extensions)
             )
 
-        extdir = os.path.abspath(
-            os.path.dirname(self.get_ext_fullpath(self.extensions[0].name))
+        return self._which("cmake")
+
+    def run(self) -> None:
+        cmake_executable = self.cmake_executable()
+
+        extension_name: str = self.extensions[0].name
+        extdir = (
+            pathlib.Path(self.get_ext_fullpath(extension_name))  # type: ignore
+            .absolute()
+            .parent
         )
         if self.debug:
             cfg = "Debug"
@@ -60,42 +164,63 @@ class CMakeBuild(build_ext):
         else:
             cfg = "Release"
 
-        cmake_args = [
-            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
-            "-DPYTHON_EXECUTABLE=" + sys.executable,
-            "-DCMAKE_BUILD_TYPE=" + cfg,
-            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}".format(cfg.upper(), extdir),
-        ]
+        cmake_args: List[str] = []
+
+        if self.cmake_generator:
+            cmake_args.extend(("-G", self.cmake_generator))
+
+        cmake_args.extend(
+            [
+                f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY:PATH={extdir}",
+                f"-DPYTHON_EXECUTABLE:FILEPATH={sys.executable}",
+                "-DCMAKE_BUILD_TYPE:STRING=" + cfg,
+                f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}:PATH={extdir}",
+            ]
+        )
         if self.cmake_options:
             cmake_args.extend(self.cmake_options.split(" "))
 
         if self.vcpkg_dir:
+            # cmake doesn't like toolchain quoted file paths for some reason...
             cmake_args.append(
-                "-DCMAKE_TOOLCHAIN_FILE={}/scripts/buildsystems/vcpkg.cmake".format(
-                    self.vcpkg_dir
-                )
+                f"-DCMAKE_TOOLCHAIN_FILE:FILEPATH={self.vcpkg_dir}"
+                "/scripts/buildsystems/vcpkg.cmake"
             )
             if self.vcpkg_triplet:
-                cmake_args.append(f"-DVCPKG_TARGET_TRIPLET={self.vcpkg_triplet}")
+                cmake_args.append(f"-DVCPKG_TARGET_TRIPLET:STRING={self.vcpkg_triplet}")
 
-        if self.cxx_compiler:
-            cmake_args.append(f"-DCMAKE_CXX_COMPILER={self.cxx_compiler}")
-        if self.cmake_generator:
-            cmake_args.extend(("-G", self.cmake_generator))
+        compiler = self.compiler_path()
+        if compiler is not None:
+            cmake_args.append(f"-DCMAKE_CXX_COMPILER:FILEPATH={compiler}")
+        else:
+            raise ValueError("Could not find an existing compiler")
 
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
 
         # CMakeLists.txt is in the same directory as this setup.py file
-        cmake_list_dir = os.path.abspath(os.path.dirname(__file__))
+        cmake_list_dir = path_str(pathlib.Path(__file__).parent)
         print("-" * 10, "Running CMake prepare", "-" * 40)
         subprocess.check_call(
-            ["cmake", cmake_list_dir] + cmake_args, cwd=self.build_temp
+            [cmake_executable, cmake_list_dir] + cmake_args, cwd=self.build_temp
         )
 
         print("-" * 10, "Building extensions", "-" * 40)
-        cmake_cmd = ["cmake", "--build", ".", "--config", cfg]
+        cmake_cmd = [cmake_executable, "--build", ".", "--config", cfg]
         subprocess.check_call(cmake_cmd, cwd=self.build_temp)
+
+        sys.path.append(str(extdir))
+        options = stubgen.parse_options(
+            [
+                "-o",
+                str(extdir),
+                "-p",
+                extension_name.split("/")[-1],
+                "--include-private",
+                "-v",
+            ]
+        )
+        stubgen.generate_stubs(options)
 
 
 try:
@@ -108,6 +233,6 @@ except VersionConflict:
 if __name__ == "__main__":
     setup(
         use_pyscaffold=True,
-        ext_modules=[CMakeExtension("polynomials/boost")],
-        cmdclass=dict(build_ext=CMakeBuild),
+        ext_modules=[CMakeExtension("polynomials/polynomials_cpp")],
+        cmdclass={"build_ext": CMakeBuild},
     )
