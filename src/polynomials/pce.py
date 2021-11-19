@@ -404,15 +404,14 @@ class AdaptivePCE:
 
     def update_convergence(self) -> bool:
         if self.pce.dimensions == 1:
-            sensitivities = np.array(self.pce.linear_model.coef_)
+            # variance is the sum of non-zero term coefficients squared
+            std = np.array(self.pce.linear_model.coef_)
+            std = np.linalg.norm(std, axis=-1)
 
-            if self.pce.linear_model.fit_intercept:
-                sensitivities[:, 0] = self.pce.linear_model.intercept_
-
-            sensitivities = np.linalg.norm(sensitivities, axis=-1)
-
-            self._errors = np.abs(sensitivities - self._sensitivities)
-            self._sensitivities = sensitivities
+            # for consistency with multi-variate polynomials use relative change in
+            # standard deviation as the error
+            self._errors = np.abs(1.0 - std / self._sensitivities)
+            self._sensitivities = std
         else:
             sensitivities = self.pce.total_sensitivities(-1)
 
@@ -420,11 +419,15 @@ class AdaptivePCE:
             self._sensitivities = sensitivities
         return self.converged
 
-    def has_converged(self, old_sensitivies: np.ndarray) -> bool:
+    def improvement_value(
+        self, old_sensitivies: np.ndarray
+    ) -> Union[np.float64, np.ndarray]:
         if self.pce.dimensions == 1:
-            errors = np.abs(self._sensitivities - old_sensitivies)
-        else:
-            errors = fit_improvement(self._sensitivities, old_sensitivies, axis=-1)
+            return np.abs(self._sensitivities - old_sensitivies)
+        return fit_improvement(self._sensitivities, old_sensitivies, axis=-1)
+
+    def has_converged(self, old_sensitivies: np.ndarray) -> bool:
+        errors = self.improvement_value(old_sensitivies)
         return np.all(errors <= self.tolerance)
 
     def improve(
