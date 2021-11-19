@@ -1,0 +1,10 @@
+{
+    "exclude": [
+        "Scripts/out/**"
+    ],
+    "reportMissingTypeStubs": false,
+    "reportGeneralTypeIssues": false,
+    "reportUnknownMemberType": false,
+    "reportUnknownVariableType": false,
+    "reportMissingModuleSource": false
+}
