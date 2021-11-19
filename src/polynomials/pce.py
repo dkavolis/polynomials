@@ -300,16 +300,14 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         else:
             targets = list(targets)
 
-        if n_targets == 1 or (len(targets) == 1 and targets[0] == 0):
+        if len(targets) == 1 and targets[0] == 0:
+            # assume synced already since only 1 target
             return function(*args, **kwargs)
 
         y = []
-        try:
-            for i in targets:
-                self._pce.assign_coefficients(self.target_coefficients(i))
-                y.append(function(*args, **kwargs))
-        finally:
-            self._pce.assign_coefficients(self.target_coefficients(0))
+        for i in targets:
+            self.sync_with_linear_model(i)
+            y.append(function(*args, **kwargs))
 
         if len(targets) == 1:
             return y[0]
