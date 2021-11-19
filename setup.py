@@ -69,23 +69,41 @@ class CMakeBuild(build_ext):
         self.cmake_generator = ""
 
     @staticmethod
-    def msvc_compiler() -> Optional[pathlib.Path]:
+    def architecture() -> str:
         import ctypes
 
+        ptr_size = ctypes.sizeof(ctypes.c_void_p)
+
+        if ptr_size == 8:
+            return "x64"
+        elif ptr_size == 4:
+            return "x86"
+        raise RuntimeError(f"Unsupported architecture with pointer size of {ptr_size}")
+
+    @staticmethod
+    def _search_msvc(pattern: str) -> Optional[pathlib.Path]:
         search_paths = [
             "C:/Program Files/Microsoft Visual Studio",
             "C:/Program Files (x86)/Microsoft Visual Studio",
         ]
 
-        cl_pattern = "**/VC/Tools/MSVC/*/bin/Hostx{0}/x{0}/cl.exe".format(
-            ctypes.sizeof(ctypes.c_void_p) * 8
-        )
-
         for path in search_paths:
-            for compiler in pathlib.Path(path).glob(cl_pattern):
+            for compiler in pathlib.Path(path).glob(pattern):
                 return compiler
 
         return None
+
+    @staticmethod
+    def msvc_compiler() -> Optional[pathlib.Path]:
+        cl_pattern = "**/VC/Tools/MSVC/*/bin/Host{0}/{0}/cl.exe".format(
+            CMakeBuild.architecture()
+        )
+
+        return CMakeBuild._search_msvc(cl_pattern)
+
+    @staticmethod
+    def msvc_vars_script() -> Optional[pathlib.Path]:
+        return CMakeBuild._search_msvc("**/VC/Auxiliary/Build/vcvarsall.bat")
 
     @staticmethod
     def _which(name: str) -> Optional[pathlib.Path]:
@@ -200,13 +218,12 @@ class CMakeBuild(build_ext):
 
         # CMakeLists.txt is in the same directory as this setup.py file
         cmake_list_dir = path_str(pathlib.Path(__file__).parent)
+        msvc_vars = self.msvc_vars_script()
         print("-" * 10, "Running CMake prepare", "-" * 40)
-        subprocess.check_call(
-            [cmake_executable, cmake_list_dir] + cmake_args, cwd=self.build_temp
-        )
-
-        print("-" * 10, "Building extensions", "-" * 40)
-        cmake_cmd = [cmake_executable, "--build", ".", "--config", cfg]
+        cmake_cmd = [cmake_executable, cmake_list_dir] + cmake_args
+        if msvc_vars is not None:
+            cmake_cmd[:0] = [path_str(msvc_vars), self.architecture(), "&&"]
+        cmake_cmd += ["&&", cmake_executable, "--build", ".", "--config", cfg]
         subprocess.check_call(cmake_cmd, cwd=self.build_temp)
 
         sys.path.append(str(extdir))
