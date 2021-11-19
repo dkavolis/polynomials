@@ -141,7 +141,16 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         else:
             X = np.asarray(X, order="F")
 
-        self.linear_model.fit(X, y)
+        try:
+            self.linear_model.fit(X, y)
+        except ValueError as e:
+            raise ValueError(
+                f"""Linear model fitting failed with
+    x:
+{x}
+    y:
+{y}"""
+            ) from e
         self.sync_with_linear_model(0)
 
         return X
