@@ -10,7 +10,45 @@ except DistributionNotFound:
 finally:
     del get_distribution, DistributionNotFound
 
-from .polynomials_cpp import *  # noqa: F403 F401
+from polynomials.polynomials_cpp import (
+    views,
+    Legendre,
+    Laguerre,
+    Chebyshev,
+    Hermite,
+    LegendreStieltjes,
+    LegendreSeries,
+    LaguerreSeries,
+    ChebyshevSeries,
+    HermiteSeries,
+    LegendreStieltjesSeries,
+    LegendreProduct,
+    LaguerreProduct,
+    ChebyshevProduct,
+    HermiteProduct,
+    LegendreStieltjesProduct,
+    LegendreProductSet,
+    LaguerreProductSet,
+    ChebyshevProductSet,
+    HermiteProductSet,
+    LegendreStieltjesProductSet,
+    LegendreSequence,
+    LaguerreSequence,
+    ChebyshevSequence,
+    HermiteSequence,
+    LegendreStieltjesSequence,
+)
+
+from polynomials.hints import (
+    Polynomial,
+    PolynomialProduct,
+    PolynomialProductSet,
+    PolynomialSequence,
+    PolynomialSeries,
+    PolynomialView,
+    PolynomialProductView,
+    PolynomialProductSetView,
+)
 
 # useless flake8
 from .pce import (  # noqa: F401
@@ -24,16 +62,10 @@ from .pce import (  # noqa: F401
 )
 
 
-def get_include_dir():
-    import os
+def get_include_dir() -> str:
+    import pathlib
 
-    return os.path.join(os.path.abspath(__file__), "include")
-
-
-def all_cpp():
-    from . import polynomials_cpp as cpp
-
-    return [i for i in dir(cpp) if not i.startswith("_")]
+    return str(pathlib.Path(__file__).parent / "include")
 
 
 __all__ = [
@@ -45,6 +77,38 @@ __all__ = [
     "fit_improvement",
     "get_include_dir",
     "AdaptivePCE",
-] + all_cpp()
-
-del all_cpp
+    "views",
+    "Legendre",
+    "Laguerre",
+    "Chebyshev",
+    "Hermite",
+    "LegendreStieltjes",
+    "LegendreSeries",
+    "LaguerreSeries",
+    "ChebyshevSeries",
+    "HermiteSeries",
+    "LegendreStieltjesSeries",
+    "LegendreProduct",
+    "LaguerreProduct",
+    "ChebyshevProduct",
+    "HermiteProduct",
+    "LegendreStieltjesProduct",
+    "LegendreProductSet",
+    "LaguerreProductSet",
+    "ChebyshevProductSet",
+    "HermiteProductSet",
+    "LegendreStieltjesProductSet",
+    "LegendreSequence",
+    "LaguerreSequence",
+    "ChebyshevSequence",
+    "HermiteSequence",
+    "LegendreStieltjesSequence",
+    "Polynomial",
+    "PolynomialProduct",
+    "PolynomialProductSet",
+    "PolynomialSequence",
+    "PolynomialSeries",
+    "PolynomialView",
+    "PolynomialProductView",
+    "PolynomialProductSetView",
+]

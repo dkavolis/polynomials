@@ -2,59 +2,91 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
     Sequence,
+    Tuple,
     Type,
+    TypeVar,
     Union,
     Protocol,
+    cast,
     runtime_checkable,
     Optional,
 )
+from typing_extensions import ParamSpec
 
 import numpy as np
 
-from .polynomials_cpp import (
+from polynomials.polynomials_cpp import (
     ChebyshevProductSet,
     HermiteProductSet,
     LaguerreProductSet,
     LegendreProductSet,
     LegendreStieltjesProductSet,
 )
+from polynomials.hints import (
+    PolynomialProductSet,
+    PolynomialProductSetView,
+)
 
 if TYPE_CHECKING:
-    from .polynomials_cpp import Sobol, Real
+    from polynomials.polynomials_cpp import Sobol
+
+P = ParamSpec("P")
+R = TypeVar("R")
+N = TypeVar("N")
+
+Floating = Union[np.dtype[np.float32], np.dtype[np.float64]]
+
+# shapes are not yet supported so skip them...
+FloatArray = np.ndarray[Any, Floating]
 
 
 @runtime_checkable
 class LinearModel(Protocol):
-    coef_: np.ndarray
-    intercept_: Union[float, np.ndarray]
+    coef_: FloatArray
+    intercept_: Union[float, FloatArray]
     fit_intercept: bool
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+    def fit(self, X: FloatArray, y: FloatArray) -> None:
         ...
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(self, X: FloatArray) -> FloatArray:
         ...
+
+
+T = TypeVar("T")
 
 
 class PCEMeta(type):
+    _TENSOR_TYPE: Type[PolynomialProductSet]
+
     def __new__(
-        mcs, name, bases, namespace, is_abstract: bool = False, tensor_type: Type = None
-    ):
-        cls = super().__new__(mcs, name, bases, namespace)
+        cls: Type[PCEMeta],
+        name: str,
+        bases: Tuple[type, ...],
+        namespace: Dict[str, Any],
+        is_abstract: bool = False,
+        tensor_type: Type[PolynomialProductSet] = None,
+    ) -> PCEMeta:
+        klass = super().__new__(cls, name, bases, namespace)
         if not is_abstract:
             if not isinstance(tensor_type, type):
                 raise ValueError(f"tensor_type must a type, got {tensor_type}")
 
-            cls._TENSOR_TYPE = tensor_type
+            setattr(klass, "_TENSOR_TYPE", tensor_type)
 
-        return cls
+        return klass
 
-    def make_pce(self, size: int, dimensions: int):
+    def make_pce(self: PCEMeta, size: int, dimensions: int) -> PolynomialProductSet:
         return self._TENSOR_TYPE(size=size, dimensions=dimensions)
 
-    def make_full_set(self, orders: Sequence[int]):
+    def make_full_set(self, orders: Iterable[int]) -> PolynomialProductSet:
         return self._TENSOR_TYPE.full_set(orders)
 
 
@@ -74,7 +106,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             self._pce = type(self).make_full_set(full_set)
         self._sobol: Sobol = None
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[PolynomialProductSetView]:
         return iter(self._pce)
 
     @property
@@ -101,7 +133,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             self._sobol = self._pce.sobol()
         return self._sobol
 
-    def fit(self, x: np.ndarray, y: np.ndarray, X: np.ndarray = None) -> np.ndarray:
+    def fit(self, x: FloatArray, y: FloatArray, X: FloatArray = None) -> FloatArray:
         """
         Fit linear model to PCE
 
@@ -133,13 +165,13 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             raise ValueError("Number of samples and inputs do not match")
 
         if X is None:
-            X = np.ndarray(
+            X = np.ndarray(  # type: ignore # constant...
                 shape=[n_samples, self.components], dtype=np.double, order="F"
             )
-            for i, component in enumerate(self._pce):
+            for i, component in enumerate(self):
                 X[:, i] = component(x).flatten()
         else:
-            X = np.asarray(X, order="F")
+            X = np.asarray(X, order="F")  # type: ignore # constant...
 
         try:
             self.linear_model.fit(X, y)
@@ -156,8 +188,9 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         return X
 
     def sync_with_linear_model(self, target: Optional[int] = None) -> None:
-        coefficients = np.asanyarray(self.linear_model.coef_)
+        coefficients: FloatArray = np.asanyarray(self.linear_model.coef_)
 
+        intercept: Optional[FloatArray]
         if self.linear_model.fit_intercept:
             intercept = np.asanyarray(self.linear_model.intercept_)
         else:
@@ -169,7 +202,8 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             if coefficients.ndim == 2:
                 if target >= len(coefficients):
                     raise ValueError(
-                        f"target {target} is out of range for {len(coefficients)} targets linear model"
+                        f"target {target} is out of range for {len(coefficients)}"
+                        " targets linear model"
                     )
             elif target != 0 and target != -1:
                 raise ValueError(
@@ -179,15 +213,20 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         if coefficients.ndim == 2:
             coefficients = coefficients[target, :]
 
-            if self.linear_model.fit_intercept:
-                intercept = intercept[target]
+        # np.asanyarray always returns an array, if intercept was float it would be an
+        # array of size 1 now
+        if intercept is not None:
+            intercept_ = intercept[target]
+        else:
+            intercept_ = None
 
-        self._set_coefficients(self._pce, coefficients, intercept)
+        self._set_coefficients(self._pce, coefficients, intercept_)
         self._sobol = None
 
     def target_coefficients(
         self, target: Optional[int], copy: bool = True
-    ) -> np.ndarray:
+    ) -> FloatArray:
+        s: Union[slice, int]
         if target is None:
             s = slice(None)
         else:
@@ -205,17 +244,12 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         if self.linear_model.fit_intercept:
             try:
-                intercept = self.linear_model.intercept_[s]
+                intercept = self.linear_model.intercept_[s]  # type: ignore # try/except
             except IndexError:
                 intercept = self.linear_model.intercept_
 
-            try:
-                index = self._pce.index([0] * self.dimensions)
-                if self.dimensions == 1:
-                    index = index[0]
-            except IndexError:
-                pass
-            else:
+            index = self._intercept_index(self._pce)
+            if index is not None:
                 if coefficients.ndim == 2:
                     coefficients[s, index] = intercept
                 else:
@@ -223,11 +257,11 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         return coefficients
 
-    def set_target_coefficients(self, target: int, coefficients: np.ndarray) -> None:
+    def set_target_coefficients(self, target: int, coefficients: FloatArray) -> None:
         self.target_coefficients(target, False)[:] = coefficients
         self._fixup_intercept(target, lambda _, x: x)
 
-    def add_target_coefficients(self, target: int, delta: np.ndarray) -> None:
+    def add_target_coefficients(self, target: int, delta: FloatArray) -> None:
         self.target_coefficients(target, False)[:] += delta
 
         def add_intercept(existing: float, value: float) -> float:
@@ -235,22 +269,36 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         self._fixup_intercept(target, add_intercept)
 
+    @staticmethod
+    def _intercept_index(pce: PolynomialProductSet) -> Optional[int]:
+        try:
+            i: Union[int, FloatArray] = pce.index([0] * pce.dimensions)
+            index: int
+            if isinstance(i, int):
+                index = i
+            else:
+                index = i[0]
+        except IndexError:
+            return None
+        else:
+            return index
+
     def _fixup_intercept(
         self, target: int, update: Callable[[float, float], float]
     ) -> None:
         intercept = None
         if self.linear_model.fit_intercept:
-            try:
-                index = self._pce.index([0] * self.dimensions)
-                if self.dimensions == 1:
-                    index = index[0]
-                old = self.linear_model.intercept_[target]
-                new = self.target_coefficients(target, False)[index]
-                intercept = update(old, new)
-                self.linear_model.intercept_[target] = intercept
-                self.target_coefficients(target, False)[index] = 0
-            except IndexError:
-                pass
+            index = self._intercept_index(self._pce)
+            if index is not None:
+                try:
+                    old: float = self.linear_model.intercept_[target]  # type: ignore
+                except TypeError:
+                    pass
+                else:
+                    new = self.target_coefficients(target, False)[index]
+                    intercept = update(old, new)
+                    self.linear_model.intercept_[target] = intercept  # type: ignore
+                    self.target_coefficients(target, False)[index] = 0
 
         if target == 0:
             self._set_coefficients(
@@ -258,35 +306,46 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             )
 
     def predict(
-        self, x: np.ndarray, targets: Union[int, Sequence[int]] = 0
-    ) -> np.ndarray:
-        def f(*args, **kwargs):
-            return self._pce(*args, **kwargs)
+        self, x: FloatArray, targets: Union[int, Sequence[int]] = 0
+    ) -> FloatArray:
+        def f(xx: FloatArray) -> FloatArray:
+            return self._pce(xx)
 
         return self._eval_targets(targets, f, x)
 
     def sensitivity(
         self, indices: Union[int, Sequence[int]], targets: Union[int, Sequence[int]] = 0
-    ) -> Union[Real, np.ndarray]:
-        def f(*args, **kwargs):
-            return self._pce.sobol().sensitivity(*args, **kwargs)
+    ) -> Union[float, FloatArray]:
+        def f(xx: FloatArray) -> Union[float, FloatArray]:
+            return self._pce.sobol().sensitivity(xx)
 
         return self._eval_targets(targets, f, indices)
 
     def total_sensitivity(
-        self, indices: Union[int, Sequence[int]], targets: Union[int, Sequence[int]] = 0
-    ) -> Union[Real, np.ndarray]:
-        def f(*args, **kwargs):
-            return self._pce.sobol().total_sensitivity(*args, **kwargs)
+        self, indices: Union[int, Iterable[int]], targets: Union[int, Iterable[int]] = 0
+    ) -> Union[float, FloatArray]:
+        def f(xx: FloatArray) -> Union[float, FloatArray]:
+            return self._pce.sobol().total_sensitivity(xx)
 
         return self._eval_targets(targets, f, indices)
 
-    def total_sensitivities(self, targets: Union[int, Sequence[int]] = 0) -> np.ndarray:
-        return self.total_sensitivity(np.arange(self.dimensions), targets)
+    def total_sensitivities(self, targets: Union[int, Iterable[int]] = 0) -> FloatArray:
+        return np.asanyarray(
+            self.total_sensitivity(
+                cast(np.ndarray[Any, np.dtype[np.int32]], np.arange(self.dimensions)),
+                targets,
+            )
+        )
 
+    # seems mypy still doesn't like ParamSpec but the usage is valid
+    # https://www.python.org/dev/peps/pep-0612/#toc-entry-12
     def _eval_targets(
-        self, targets: Union[int, Sequence[int]], function: Callable, *args, **kwargs
-    ):
+        self,
+        targets: Union[int, Iterable[int]],
+        function: Callable[P, R],  # type: ignore
+        *args: P.args,  # type: ignore
+        **kwargs: P.kwargs,  # type: ignore
+    ) -> Union[R, FloatArray]:
 
         if isinstance(targets, int):
             if targets < 0:
@@ -304,7 +363,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             # assume synced already since only 1 target
             return function(*args, **kwargs)
 
-        y = []
+        y: List[R] = []
         for i in targets:
             self.sync_with_linear_model(i)
             y.append(function(*args, **kwargs))
@@ -314,20 +373,23 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         return np.asarray(y)
 
     @property
-    def coefficients(self) -> np.ndarray:
+    def coefficients(self) -> FloatArray:
         return self.linear_model.coef_
 
     @staticmethod
-    def _set_coefficients(pce, coefficients, intercept=None):
+    def _set_coefficients(
+        pce: PolynomialProductSet,
+        coefficients: FloatArray,
+        intercept: Optional[float] = None,
+    ):
+        component: PolynomialProductSetView
         for i, component in enumerate(pce):
             component.coefficient = coefficients[i]
 
         if intercept is not None:
-            try:
-                index = pce.index([0] * pce.dimensions)
+            index = PCEBase._intercept_index(pce)
+            if index is not None:
                 pce[index].coefficient = intercept
-            except IndexError:
-                pass
 
 
 class LegendrePCE(PCEBase, tensor_type=LegendreProductSet):
@@ -351,11 +413,11 @@ class LegendreStieltjesPCE(PCEBase, tensor_type=LegendreStieltjesProductSet):
 
 
 def fit_improvement(
-    sensitivities: np.ndarray,
-    previous_sensitivities: np.ndarray,
+    sensitivities: FloatArray,
+    previous_sensitivities: FloatArray,
     axis: int = None,
-    out: np.ndarray = None,
-) -> float:
+    out: FloatArray = None,
+) -> Union[float, FloatArray]:
     sensitivities = np.asarray(sensitivities)
     previous_sensitivities = np.asarray(previous_sensitivities)
     differences = np.abs(sensitivities - previous_sensitivities)
@@ -365,14 +427,15 @@ def fit_improvement(
 class AdaptivePCE:
     def __init__(self, pce: PCEBase, tolerance: float, targets: int = 1):
         self.pce = pce
+        self._sensitivities: FloatArray
         if pce.dimensions == 1:
             self._sensitivities = np.zeros([targets], dtype=np.double)
         else:
             self._sensitivities = np.zeros([pce.dimensions, targets], dtype=np.double)
-        self._errors: np.ndarray = np.ones([targets]) * np.inf
+        self._errors: FloatArray = np.ones([targets]) * np.inf
         self.tolerance = tolerance
-        self._x: np.ndarray = np.zeros([0])
-        self._y: np.ndarray = np.zeros([0])
+        self._x: FloatArray = np.zeros([0])
+        self._y: FloatArray = np.zeros([0])
 
     @property
     def sample_count(self) -> int:
@@ -383,18 +446,18 @@ class AdaptivePCE:
         return len(self._errors)
 
     @property
-    def errors(self) -> np.ndarray:
+    def errors(self) -> FloatArray:
         return self._errors
 
     @property
-    def sensitivities(self) -> np.ndarray:
+    def sensitivities(self) -> FloatArray:
         return self._sensitivities
 
     @property
     def converged(self) -> bool:
-        return np.all(self._errors <= self.tolerance)
+        return cast(bool, np.all(cast(FloatArray, self._errors <= self.tolerance)))
 
-    def fit(self, x: np.ndarray, y: np.ndarray) -> bool:
+    def fit(self, x: FloatArray, y: FloatArray) -> bool:
         y = np.asarray(y)
         targets = 1
         if y.ndim > 1:
@@ -405,7 +468,7 @@ class AdaptivePCE:
     def update_convergence(self) -> bool:
         if self.pce.dimensions == 1:
             # variance is the sum of non-zero term coefficients squared
-            std = np.array(self.pce.linear_model.coef_)
+            std: FloatArray = np.array(self.pce.linear_model.coef_)
             std = np.linalg.norm(std, axis=-1)
 
             # for consistency with multi-variate polynomials use relative change in
@@ -415,23 +478,25 @@ class AdaptivePCE:
         else:
             sensitivities = self.pce.total_sensitivities(-1)
 
-            self._errors = fit_improvement(sensitivities, self._sensitivities, axis=-1)
+            self._errors = np.asanyarray(
+                fit_improvement(sensitivities, self._sensitivities, axis=-1)
+            )
             self._sensitivities = sensitivities
         return self.converged
 
     def improvement_value(
-        self, old_sensitivies: np.ndarray
-    ) -> Union[np.float64, np.ndarray]:
+        self, old_sensitivies: FloatArray
+    ) -> Union[float, FloatArray]:
         if self.pce.dimensions == 1:
             return np.abs(self._sensitivities - old_sensitivies)
         return fit_improvement(self._sensitivities, old_sensitivies, axis=-1)
 
-    def has_converged(self, old_sensitivies: np.ndarray) -> bool:
+    def has_converged(self, old_sensitivies: FloatArray) -> bool:
         errors = self.improvement_value(old_sensitivies)
-        return np.all(errors <= self.tolerance)
+        return cast(bool, cast(FloatArray, errors <= self.tolerance).all())
 
     def improve(
-        self, x: np.ndarray, y: np.ndarray, update_convergence: bool = True
+        self, x: FloatArray, y: FloatArray, update_convergence: bool = True
     ) -> bool:
         x = np.asarray(x)
         y = np.asarray(y)
@@ -446,7 +511,7 @@ class AdaptivePCE:
         return self.converged
 
     def improve_extend(
-        self, x: np.ndarray, y: np.ndarray, update_convergence: bool = True
+        self, x: FloatArray, y: FloatArray, update_convergence: bool = True
     ) -> bool:
         if self._x.size == 0:
             x = np.array(x, copy=True)
@@ -457,6 +522,6 @@ class AdaptivePCE:
         return self.improve(x, y, update_convergence)
 
     def predict(
-        self, x: np.ndarray, targets: Union[int, Sequence[int]] = -1
-    ) -> np.ndarray:
+        self, x: FloatArray, targets: Union[int, Sequence[int]] = -1
+    ) -> FloatArray:
         return self.pce.predict(x, targets)
