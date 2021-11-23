@@ -33,13 +33,12 @@ PYBIND11_MODULE(polynomials_cpp, m) {
 
   // poly::bind_number<poly::Quad>(m, "Real");
 
+  poly::bind_sobol<poly::Quad>(m, "Sobol");
   poly::bind_all_polynomials<poly::LegendreImpl<poly::Quad>>(m, "Legendre");
   poly::bind_all_polynomials<poly::LaguerreImpl<poly::Quad>>(m, "Laguerre");
   poly::bind_all_polynomials<poly::HermiteImpl<poly::Quad>>(m, "Hermite");
   poly::bind_all_polynomials<poly::ChebyshevImpl<poly::Quad>>(m, "Chebyshev");
   poly::bind_all_polynomials<poly::LegendreStieltjesImpl<poly::Quad>>(m, "LegendreStieltjes");
-
-  poly::bind_sobol<poly::Quad>(m, "Sobol");
 
   // NOLINTNEXTLINE(performance-unnecessary-value-param)
   py::register_exception_translator([](std::exception_ptr p) {

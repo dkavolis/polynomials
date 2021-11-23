@@ -123,6 +123,12 @@ auto to_range(py::array_t<T>& array, ssize_t dimension = 0) -> strided_view<T> {
 
 constexpr auto value_caster = [](auto&& value) { return py::str(py::cast(value)); };
 
+[[nodiscard]] inline auto to_index(ssize_t index, size_t size) -> size_t {
+  if (index < 0) index += size;
+  if (index >= static_cast<ssize_t>(size) || index < 0) throw py::index_error("Invalid index");
+  return static_cast<size_t>(index);
+}
+
 template <class Range, class F = decltype(value_caster),
           typename = std::enable_if_t<detail::is_range<Range>::value>>
 class RangeFormatter {
@@ -1010,11 +1016,14 @@ auto bind_polynomial_product_set(py::module& m, const char* name) -> py::class_<
                                  py::keep_alive<0, 1>{})
           .def(
               "__iter__", [](T& self) { return py::make_iterator(self); }, py::keep_alive<0, 1>{})
-          .def("__getitem__", py::overload_cast<std::size_t>(&T::at), py::keep_alive<0, 1>{})
+          .def(
+              "__getitem__",
+              [](T& self, ssize_t index) { return self[to_index(index, self.size())]; },
+              py::keep_alive<0, 1>{})
           .def("clear", [](T& self) { self.clear(); })
           .def("resize", [](T& self, std::size_t size) { self.resize(size); })
           .def("sobol", &T::template sobol<>)
-          .def("erase", &T::template erase<true>)
+          .def("erase", [](T& self, ssize_t index) { self.erase(to_index(index, self.size())); })
           .def("merge_repeated", &T::merge_repeated)
           .def("assign",
                [](T& self,
