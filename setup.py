@@ -35,9 +35,11 @@ def path_str(path: pathlib.Path) -> str:
     return str(path).replace("\\", "/")
 
 
-def stringify(f: Callable[P, Optional[pathlib.Path]]) -> Callable[P, str]:
+def stringify(
+    f: Callable[P, Optional[pathlib.Path]]  # type: ignore
+) -> Callable[P, str]:  # type: ignore
     @functools.wraps(f)
-    def wrapped(*args: P.args, **kwargs: P.kwargs) -> str:
+    def wrapped(*args: P.args, **kwargs: P.kwargs) -> str:  # type: ignore
         path = f(*args, **kwargs)
 
         if path is None:
@@ -191,8 +193,12 @@ class CMakeBuild(build_ext):
             [
                 f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY:PATH={extdir}",
                 f"-DPYTHON_EXECUTABLE:FILEPATH={sys.executable}",
+                f"-DPYTHON_ROOT_DIR:PATH={os.path.dirname(sys.executable)}",
                 "-DCMAKE_BUILD_TYPE:STRING=" + cfg,
                 f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}:PATH={extdir}",
+                "-DPOLYNOMIALS_PYTHON_VERSION:STRING={v.major}.{v.minor}".format(
+                    v=sys.version_info
+                ),
             ]
         )
         if self.cmake_options:
