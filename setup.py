@@ -21,6 +21,7 @@ from mypy import stubgen
 import pathlib
 import shutil
 import functools
+import sysconfig
 
 
 class CMakeExtension(Extension):
@@ -192,13 +193,14 @@ class CMakeBuild(build_ext):
         cmake_args.extend(
             [
                 f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY:PATH={extdir}",
-                f"-DPYTHON_EXECUTABLE:FILEPATH={sys.executable}",
-                f"-DPYTHON_ROOT_DIR:PATH={os.path.dirname(sys.executable)}",
+                f"-DPython3_EXECUTABLE:FILEPATH={sys.executable}",
+                f"-DPython3_ROOT_DIR:PATH={os.path.dirname(sys.executable)}",
                 "-DCMAKE_BUILD_TYPE:STRING=" + cfg,
                 f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}:PATH={extdir}",
                 "-DPOLYNOMIALS_PYTHON_VERSION:STRING={v.major}.{v.minor}".format(
                     v=sys.version_info
                 ),
+                f"-DPython3_INCLUDE_DIR:PATH={sysconfig.get_path('include')}",
             ]
         )
         if self.cmake_options:
