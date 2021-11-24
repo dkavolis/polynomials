@@ -37,14 +37,16 @@ from polynomials.hints import (
 if TYPE_CHECKING:
     from polynomials.polynomials_cpp import Sobol
 
+    # shapes are not yet supported so skip them...
+    FloatArray = Union[
+        np.ndarray[Any, np.dtype[np.float32]], np.ndarray[Any, np.dtype[np.float64]]
+    ]
+else:
+    FloatArray = np.ndarray
+
 P = ParamSpec("P")
 R = TypeVar("R")
 N = TypeVar("N")
-
-Floating = Union[np.dtype[np.float32], np.dtype[np.float64]]
-
-# shapes are not yet supported so skip them...
-FloatArray = np.ndarray[Any, Floating]
 
 
 @runtime_checkable
