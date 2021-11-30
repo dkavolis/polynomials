@@ -58,6 +58,11 @@ class LinearModel(Protocol):
     def predict(self, X: FloatArray) -> FloatArray:
         ...
 
+    def score(
+        self, X: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = ...
+    ) -> float:
+        ...
+
 
 T = TypeVar("T")
 
@@ -164,11 +169,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             raise ValueError("Number of samples and inputs do not match")
 
         if X is None:
-            X = np.ndarray(  # type: ignore # constant...
-                shape=[n_samples, self.components], dtype=np.double, order="F"
-            )
-            for i, component in enumerate(self):
-                X[:, i] = component(x).flatten()
+            X = self._sample_array(x)  # type: ignore # constant...
         else:
             X = np.asarray(X, order="F")  # type: ignore # constant...
 
@@ -221,6 +222,17 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         self._set_coefficients(self._pce, coefficients, intercept_)
         self._sobol = None
+
+    def _sample_array(self, x: FloatArray) -> FloatArray:
+        x = np.asanyarray(x)
+
+        X = np.empty(  # type: ignore # constant...
+            shape=[len(x), self.components], dtype=np.double, order="F"
+        )
+        for i, component in enumerate(self):
+            X[:, i] = component(x).flatten()
+
+        return X
 
     def target_coefficients(
         self, target: Optional[int], copy: bool = True
@@ -311,6 +323,12 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             return self._pce(xx)
 
         return self._eval_targets(targets, f, x)
+
+    def score(
+        self, x: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = None
+    ) -> float:
+        X = self._sample_array(x)
+        return self.linear_model.score(X, y, sample_weight=sample_weight)
 
     def sensitivity(
         self, indices: Union[int, Sequence[int]], targets: Union[int, Sequence[int]] = 0
@@ -524,3 +542,8 @@ class AdaptivePCE:
         self, x: FloatArray, targets: Union[int, Sequence[int]] = -1
     ) -> FloatArray:
         return self.pce.predict(x, targets)
+
+    def score(
+        self, x: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = None
+    ) -> float:
+        return self.pce.score(x, y, sample_weight)
