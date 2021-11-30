@@ -21,6 +21,7 @@ from typing import (
 from typing_extensions import ParamSpec
 
 import numpy as np
+import numpy.typing as npt
 
 from polynomials.polynomials_cpp import (
     ChebyshevProductSet,
@@ -37,12 +38,8 @@ from polynomials.hints import (
 if TYPE_CHECKING:
     from polynomials.polynomials_cpp import Sobol
 
-    # shapes are not yet supported so skip them...
-    FloatArray = Union[
-        np.ndarray[Any, np.dtype[np.float32]], np.ndarray[Any, np.dtype[np.float64]]
-    ]
-else:
-    FloatArray = np.ndarray
+# shapes are not yet supported so skip them...
+FloatArray = Union[npt.NDArray[np.float32], npt.NDArray[np.float64]]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -334,7 +331,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
     def total_sensitivities(self, targets: Union[int, Iterable[int]] = 0) -> FloatArray:
         return np.asanyarray(
             self.total_sensitivity(
-                cast(np.ndarray[Any, np.dtype[np.int32]], np.arange(self.dimensions)),
+                cast(npt.NDArray[np.int32], np.arange(self.dimensions)),
                 targets,
             )
         )
