@@ -338,9 +338,14 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         return self._eval_targets(targets, f, x)
 
     def score(
-        self, x: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = None
+        self,
+        x: FloatArray,
+        y: FloatArray,
+        sample_weight: Optional[FloatArray] = None,
+        X: Optional[FloatArray] = None,
     ) -> float:
-        X = self.sample_array(x)
+        if X is None:
+            X = self.sample_array(x)  # type: ignore
         return self.linear_model.score(X, y, sample_weight=sample_weight)
 
     def sensitivity(
@@ -560,6 +565,10 @@ class AdaptivePCE:
         return self.pce.predict(x, targets)
 
     def score(
-        self, x: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = None
+        self,
+        x: FloatArray,
+        y: FloatArray,
+        sample_weight: Optional[FloatArray] = None,
+        X: Optional[FloatArray] = None,
     ) -> float:
-        return self.pce.score(x, y, sample_weight)
+        return self.pce.score(x, y, sample_weight=sample_weight, X=X)
