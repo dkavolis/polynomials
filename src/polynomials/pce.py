@@ -113,6 +113,10 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         self._sobol: Sobol = None
 
     @property
+    def polynomial_type(self) -> Type[PolynomialProductSet]:
+        return type(self).TENSOR_TYPE
+
+    @property
     def index_set(self) -> Set[Tuple[int, ...]]:
         return set(
             tuple(cast(Polynomial, polynomial).order for polynomial in product)
