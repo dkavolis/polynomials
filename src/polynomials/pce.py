@@ -9,6 +9,7 @@ from typing import (
     Iterator,
     List,
     Sequence,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -31,6 +32,7 @@ from polynomials.polynomials_cpp import (
     LegendreStieltjesProductSet,
 )
 from polynomials.hints import (
+    Polynomial,
     PolynomialProductSet,
     PolynomialProductSetView,
 )
@@ -68,7 +70,7 @@ T = TypeVar("T")
 
 
 class PCEMeta(type):
-    _TENSOR_TYPE: Type[PolynomialProductSet]
+    TENSOR_TYPE: Type[PolynomialProductSet]
 
     def __new__(
         cls: Type[PCEMeta],
@@ -83,15 +85,15 @@ class PCEMeta(type):
             if not isinstance(tensor_type, type):
                 raise ValueError(f"tensor_type must a type, got {tensor_type}")
 
-            setattr(klass, "_TENSOR_TYPE", tensor_type)
+            setattr(klass, "TENSOR_TYPE", tensor_type)
 
         return klass
 
     def make_pce(self: PCEMeta, size: int, dimensions: int) -> PolynomialProductSet:
-        return self._TENSOR_TYPE(size=size, dimensions=dimensions)
+        return self.TENSOR_TYPE(size=size, dimensions=dimensions)
 
     def make_full_set(self, orders: Iterable[int]) -> PolynomialProductSet:
-        return self._TENSOR_TYPE.full_set(orders)
+        return self.TENSOR_TYPE.full_set(orders)
 
 
 class PCEBase(metaclass=PCEMeta, is_abstract=True):
@@ -109,6 +111,13 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         else:
             self._pce = type(self).make_full_set(full_set)
         self._sobol: Sobol = None
+
+    @property
+    def index_set(self) -> Set[Tuple[int, ...]]:
+        return set(
+            tuple(cast(Polynomial, polynomial).order for polynomial in product)
+            for product in self
+        )
 
     def __iter__(self) -> Iterator[PolynomialProductSetView]:
         return iter(self._pce)
@@ -169,7 +178,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             raise ValueError("Number of samples and inputs do not match")
 
         if X is None:
-            X = self._sample_array(x)  # type: ignore # constant...
+            X = self.sample_array(x)  # type: ignore # constant...
         else:
             X = np.asarray(X, order="F")  # type: ignore # constant...
 
@@ -223,7 +232,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         self._set_coefficients(self._pce, coefficients, intercept_)
         self._sobol = None
 
-    def _sample_array(self, x: FloatArray) -> FloatArray:
+    def sample_array(self, x: FloatArray) -> FloatArray:
         x = np.asanyarray(x)
 
         X = np.empty(  # type: ignore # constant...
@@ -327,7 +336,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
     def score(
         self, x: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = None
     ) -> float:
-        X = self._sample_array(x)
+        X = self.sample_array(x)
         return self.linear_model.score(X, y, sample_weight=sample_weight)
 
     def sensitivity(
@@ -513,12 +522,16 @@ class AdaptivePCE:
         return cast(bool, cast(FloatArray, errors <= self.tolerance).all())
 
     def improve(
-        self, x: FloatArray, y: FloatArray, update_convergence: bool = True
+        self,
+        x: FloatArray,
+        y: FloatArray,
+        update_convergence: bool = True,
+        X: Optional[FloatArray] = None,
     ) -> bool:
         x = np.asarray(x)
         y = np.asarray(y)
 
-        self.pce.fit(x, y)
+        self.pce.fit(x, y, X=X)
 
         self._x = x
         self._y = y
@@ -528,7 +541,11 @@ class AdaptivePCE:
         return self.converged
 
     def improve_extend(
-        self, x: FloatArray, y: FloatArray, update_convergence: bool = True
+        self,
+        x: FloatArray,
+        y: FloatArray,
+        update_convergence: bool = True,
+        X: Optional[FloatArray] = None,
     ) -> bool:
         if self._x.size == 0:
             x = np.array(x, copy=True)
@@ -536,7 +553,7 @@ class AdaptivePCE:
         else:
             x = np.vstack((self._x, x))
             y = np.vstack((self._y, y))
-        return self.improve(x, y, update_convergence)
+        return self.improve(x, y, update_convergence, X=X)
 
     def predict(
         self, x: FloatArray, targets: Union[int, Sequence[int]] = -1
