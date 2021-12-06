@@ -498,27 +498,22 @@ class AdaptivePCE:
     def update_convergence(self) -> bool:
         if self.pce.dimensions == 1:
             # variance is the sum of non-zero term coefficients squared
-            std: FloatArray = np.array(self.pce.linear_model.coef_)
-            std = np.linalg.norm(std, axis=-1)
-
-            # for consistency with multi-variate polynomials use relative change in
-            # standard deviation as the error
-            self._errors = np.abs(1.0 - std / self._sensitivities)
-            self._sensitivities = std
+            sensitivities = np.linalg.norm(self.pce.linear_model.coef_, axis=-1)
         else:
             sensitivities = self.pce.total_sensitivities(-1)
 
-            self._errors = np.asanyarray(
-                fit_improvement(sensitivities, self._sensitivities, axis=-1)
-            )
-            self._sensitivities = sensitivities
+        prev_sensitivities, self._sensitivities = self._sensitivities, sensitivities
+        self._errors = np.asanyarray(self.improvement_value(prev_sensitivities))
+
         return self.converged
 
     def improvement_value(
         self, old_sensitivies: FloatArray
     ) -> Union[float, FloatArray]:
         if self.pce.dimensions == 1:
-            return np.abs(self._sensitivities - old_sensitivies)
+            # for consistency with multi-variate polynomials use relative change in
+            # standard deviation as the error
+            return np.abs(1.0 - self._sensitivities / old_sensitivies)
         return fit_improvement(self._sensitivities, old_sensitivies, axis=-1)
 
     def has_converged(self, old_sensitivies: FloatArray) -> bool:
