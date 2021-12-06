@@ -22,6 +22,13 @@ import pathlib
 import shutil
 import functools
 import sysconfig
+import enum
+
+
+class BuildType(enum.Enum):
+    Debug = "Debug"
+    Release = "Release"
+    RelWithDebInfo = "RelWithDebInfo"
 
 
 class CMakeExtension(Extension):
@@ -55,11 +62,12 @@ class CMakeBuild(build_ext):
     user_options: List[Tuple[str, Any, str]] = build_ext.user_options
     user_options.extend(
         [
-            ("cmake-options=", None, "Additional options to pass to cmake"),
+            ("cmake-options", None, "Additional options to pass to cmake"),
             ("vcpkg_dir", None, "Path to vcpkg"),
             ("vcpkg_triplet", None, "Triplet to use with vcpkg"),
             ("cxx_compiler", None, "Compiler to use for building the extension"),
             ("cmake_generator", None, "CMake generator to use"),
+            ("build_type", None, "CMake build type (Debug, Release, RelWithDebInfo)"),
         ]
     )
 
@@ -70,6 +78,13 @@ class CMakeBuild(build_ext):
         self.vcpkg_triplet = ""
         self.cxx_compiler = ""
         self.cmake_generator = ""
+        self.build_type = BuildType.Release
+
+    def finalize_options(self) -> None:
+        super().finalize_options()
+
+        if isinstance(self.build_type, str):
+            self.build_type = BuildType(self.build_type)
 
     @staticmethod
     def architecture() -> str:
@@ -179,11 +194,9 @@ class CMakeBuild(build_ext):
             .absolute()
             .parent
         )
-        if self.debug:
-            cfg = "Debug"
-            print("Building C++ extensions in debug mode")
-        else:
-            cfg = "Release"
+
+        cfg = self.build_type.name
+        print(f"Building C++ extensions in {cfg} mode")
 
         cmake_args: List[str] = []
 
