@@ -96,6 +96,9 @@ class PCEMeta(type):
         return self.TENSOR_TYPE.full_set(orders)
 
 
+PCEBaseType = TypeVar("PCEBaseType", bound="PCEBase")
+
+
 class PCEBase(metaclass=PCEMeta, is_abstract=True):
     def __init__(
         self,
@@ -111,6 +114,13 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         else:
             self._pce = type(self).make_full_set(full_set)
         self._sobol: Sobol = None
+        self._sample_array: Optional[FloatArray] = None
+
+    @property
+    def sample_array(self) -> FloatArray:
+        if self._sample_array is None:
+            raise ValueError("Tried to access sample_array before fitting")
+        return self._sample_array
 
     @property
     def polynomial_type(self) -> Type[PolynomialProductSet]:
@@ -150,7 +160,9 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             self._sobol = self._pce.sobol()
         return self._sobol
 
-    def fit(self, x: FloatArray, y: FloatArray, X: FloatArray = None) -> FloatArray:
+    def fit(
+        self: PCEBaseType, x: FloatArray, y: FloatArray, X: FloatArray = None
+    ) -> PCEBaseType:
         """
         Fit linear model to PCE
 
@@ -166,7 +178,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         Returns
         -------
-        X : np.ndarray of shape (n_samples, components)
+        self
         """
         x = np.asarray(x)
         if x.ndim > 2 or x.ndim == 0:
@@ -197,8 +209,9 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 {y}"""
             ) from e
         self.sync_with_linear_model(0)
+        self._sample_array = X
 
-        return X
+        return self
 
     def sync_with_linear_model(self, target: Optional[int] = None) -> None:
         coefficients: FloatArray = np.asanyarray(self.linear_model.coef_)
