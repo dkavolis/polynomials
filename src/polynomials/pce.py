@@ -117,7 +117,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         self._sample_array: Optional[FloatArray] = None
 
     @property
-    def sample_array(self) -> FloatArray:
+    def X_(self) -> FloatArray:
         if self._sample_array is None:
             raise ValueError("Tried to access sample_array before fitting")
         return self._sample_array
@@ -514,13 +514,12 @@ class AdaptivePCE:
         return self.improve(x, y)
 
     def update_convergence(self) -> bool:
+        prev_sensitivities = self._sensitivities
         if self.pce.dimensions == 1:
             # variance is the sum of non-zero term coefficients squared
-            sensitivities = np.linalg.norm(self.pce.linear_model.coef_, axis=-1)
+            self._sensitivities = np.linalg.norm(self.pce.linear_model.coef_, axis=-1)
         else:
-            sensitivities = self.pce.total_sensitivities(-1)
-
-        prev_sensitivities, self._sensitivities = self._sensitivities, sensitivities
+            self._sensitivities = self.pce.total_sensitivities(-1)
         self._errors = np.asanyarray(self.improvement_value(prev_sensitivities))
 
         return self.converged
