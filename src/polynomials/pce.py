@@ -517,7 +517,9 @@ class AdaptivePCE:
         prev_sensitivities = self._sensitivities
         if self.pce.dimensions == 1:
             # variance is the sum of non-zero term coefficients squared
-            self._sensitivities = np.linalg.norm(self.pce.linear_model.coef_, axis=-1)
+            self._sensitivities = np.inner(
+                self.pce.linear_model.coef_, self.pce.linear_model.coef_
+            )
         else:
             self._sensitivities = self.pce.total_sensitivities(-1)
         self._errors = np.asanyarray(self.improvement_value(prev_sensitivities))
