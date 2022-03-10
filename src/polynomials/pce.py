@@ -54,7 +54,9 @@ class LinearModel(Protocol):
     intercept_: Union[float, FloatArray]
     fit_intercept: bool
 
-    def fit(self, X: FloatArray, y: FloatArray) -> None:
+    def fit(
+        self, X: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray]
+    ) -> None:
         ...
 
     def predict(self, X: FloatArray) -> FloatArray:
@@ -161,7 +163,11 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         return self._sobol
 
     def fit(
-        self: PCEBaseType, x: FloatArray, y: FloatArray, X: FloatArray = None
+        self: PCEBaseType,
+        x: FloatArray,
+        y: FloatArray,
+        sample_weight: Optional[FloatArray] = None,
+        X: Optional[FloatArray] = None,
     ) -> PCEBaseType:
         """
         Fit linear model to PCE
@@ -172,6 +178,8 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             samples
         y : array-like of shape (n_samples) or (n_samples, n_targets)
             sampled values
+        sample_weight: optional array-like of shape (n_samples,)
+            sample weights
         X : optional array-like of shape (n_samples, components)
             can be optionally provided to save on recalculating if samples and
             components have not changed
@@ -199,7 +207,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             X = np.asarray(X, order="F")  # type: ignore # constant...
 
         try:
-            self.linear_model.fit(X, y)
+            self.linear_model.fit(X, y, sample_weight=sample_weight)
         except ValueError as e:
             raise ValueError(
                 f"""Linear model fitting failed with
@@ -505,13 +513,15 @@ class AdaptivePCE:
     def converged(self) -> bool:
         return cast(bool, np.all(cast(FloatArray, self._errors <= self.tolerance)))
 
-    def fit(self, x: FloatArray, y: FloatArray) -> bool:
+    def fit(
+        self, x: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = None
+    ) -> bool:
         y = np.asarray(y)
         targets = 1
         if y.ndim > 1:
             targets = y.shape[1]
         self._sensitivities = np.zeros([self.pce.dimensions, targets])
-        return self.improve(x, y)
+        return self.improve(x, y, sample_weight=sample_weight)
 
     def update_convergence(self) -> bool:
         prev_sensitivities = self._sensitivities
@@ -542,12 +552,13 @@ class AdaptivePCE:
         x: FloatArray,
         y: FloatArray,
         update_convergence: bool = True,
+        sample_weight: Optional[FloatArray] = None,
         X: Optional[FloatArray] = None,
     ) -> bool:
         x = np.asarray(x)
         y = np.asarray(y)
 
-        self.pce.fit(x, y, X=X)
+        self.pce.fit(x, y, sample_weight=sample_weight, X=X)
 
         self._x = x
         self._y = y
