@@ -44,7 +44,7 @@ Additional cmake options can be passed as
 python setup.py build --cmake-options="-DCMAKE_CXX_COMPILER=/usr/bin/g++"
 ```
 
-or in [setup.user.cfg](setup.user.cfg):
+or in `setup.user.cfg`:
 
 ```bash
 [build_ext]
