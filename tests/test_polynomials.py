@@ -1,11 +1,22 @@
-from typing import Iterable, Tuple, Union
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from typing import Callable, Iterable, Optional, Tuple, Union, Type
 
 import pytest
 
 import numpy as np
+from polynomials.hints import Polynomial
 import utils
 
-from polynomials import Chebyshev, Hermite, Laguerre, Legendre, LegendreStieltjes
+from polynomials import (
+    Chebyshev,
+    Hermite,
+    Laguerre,
+    Legendre,
+    LegendreStieltjes,
+    ArrayFloat,
+)
 
 
 class Expected:
@@ -21,13 +32,17 @@ class Expected:
         order: int = 3,
     ):
         self.order = order
-        self.y = np.asarray(y)
+        self.y: ArrayFloat = np.asarray(y)
         self.x = np.ones_like(self.y) * np.asarray(x)
         self.domain = domain
-        self.prime = None if prime is None else np.asarray(prime)
-        self.zeros = None if zeros is None else np.asarray(zeros)
-        self.weights = None if weights is None else np.asarray(weights)
-        self.abscissa = None if abscissa is None else np.asarray(abscissa)
+        self.prime: Optional[ArrayFloat] = None if prime is None else np.asarray(prime)
+        self.zeros: Optional[ArrayFloat] = None if zeros is None else np.asarray(zeros)
+        self.weights: Optional[ArrayFloat] = (
+            None if weights is None else np.asarray(weights)
+        )
+        self.abscissa: Optional[ArrayFloat] = (
+            None if abscissa is None else np.asarray(abscissa)
+        )
 
 
 EXPECTED = {
@@ -59,19 +74,20 @@ EXPECTED = {
 
 
 @pytest.fixture(scope="module", params=list(EXPECTED.keys()))
-def expectation(request):
-    return request.param(EXPECTED[request.param].order), EXPECTED[request.param]
+def expectation(request: pytest.FixtureRequest) -> Tuple[Polynomial, Expected]:
+    p: Type[Polynomial] = request.param  # type: ignore # really as SubRequest
+    return p(EXPECTED[p].order), EXPECTED[p]
 
 
-def uses_fixture(f):
-    def wrapper(expectation):
+def uses_fixture(f: Callable[[Polynomial, Expected], None]):
+    def wrapper(expectation: Tuple[Polynomial, Expected]):
         f(*expectation)
 
     return wrapper
 
 
 @uses_fixture
-def test_properties(polynomial, expected):
+def test_properties(polynomial: Polynomial, expected: Expected):
     assert polynomial.order == expected.order
 
     copy = type(polynomial)(polynomial)
@@ -84,40 +100,42 @@ def test_properties(polynomial, expected):
 
 
 @uses_fixture
-def test_callable(polynomial, expected):
+def test_callable(polynomial: Polynomial, expected: Expected):
     assert polynomial(expected.x[0]) == pytest.approx(expected.y[0])
     utils.assert_allclose(polynomial(expected.x), expected.y)
 
 
 @uses_fixture
-def test_prime(polynomial, expected):
+def test_prime(polynomial: Polynomial, expected: Expected):
     if expected.prime is not None:
         assert polynomial.prime(expected.x[0]) == pytest.approx(expected.prime[0])
-        utils.assert_allclose(polynomial.prime(expected.x), expected.prime)
+        utils.assert_allclose(
+            polynomial.prime(expected.x), expected.prime  # type: ignore
+        )
 
 
 @uses_fixture
-def test_zeros(polynomial, expected):
+def test_zeros(polynomial: Polynomial, expected: Expected):
     if expected.zeros is not None:
-        utils.assert_allclose(polynomial.zeros(), expected.zeros)
+        utils.assert_allclose(polynomial.zeros(), expected.zeros)  # type: ignore
 
 
 @uses_fixture
-def test_weights(polynomial, expected):
+def test_weights(polynomial: Polynomial, expected: Expected):
     if expected.weights is not None:
-        utils.assert_allclose(polynomial.weights(), expected.weights)
+        utils.assert_allclose(polynomial.weights(), expected.weights)  # type: ignore
 
 
 @uses_fixture
-def test_abscissa(polynomial, expected):
+def test_abscissa(polynomial: Polynomial, expected: Expected):
     if expected.abscissa is not None:
-        utils.assert_allclose(polynomial.abscissa(), expected.abscissa)
+        utils.assert_allclose(polynomial.abscissa(), expected.abscissa)  # type: ignore
 
 
 @uses_fixture
-def test_pickleable(polynomial, _):
+def test_pickleable(polynomial: Polynomial, _):
     import pickle
 
-    copy = pickle.loads(pickle.dumps(polynomial))
+    copy: Polynomial = pickle.loads(pickle.dumps(polynomial))
     assert copy is not polynomial
     assert copy.order == polynomial.order

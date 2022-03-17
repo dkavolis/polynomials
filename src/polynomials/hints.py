@@ -2,6 +2,9 @@
 # -*- coding:utf-8 -*-
 
 from typing import Union
+import numpy.typing as npt
+import numpy as np
+
 from polynomials.polynomials_cpp import (
     Legendre,
     Laguerre,
@@ -88,3 +91,9 @@ PolynomialView = Union[
     views.HermiteView,
     views.LegendreStieltjesView,
 ]
+
+# shapes are not yet supported so skip them...
+ArrayF16 = npt.NDArray[np.float16]
+ArrayF32 = npt.NDArray[np.float32]
+ArrayF64 = npt.NDArray[np.float64]
+ArrayFloat = Union[ArrayF16, ArrayF32, ArrayF64]

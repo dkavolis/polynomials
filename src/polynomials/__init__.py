@@ -1,4 +1,6 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 from pkg_resources import get_distribution, DistributionNotFound
 
 try:
@@ -48,6 +50,9 @@ from polynomials.hints import (
     PolynomialView,
     PolynomialProductView,
     PolynomialProductSetView,
+    ArrayF32,
+    ArrayF64,
+    ArrayFloat,
 )
 
 # useless flake8
@@ -111,4 +116,7 @@ __all__ = [
     "PolynomialView",
     "PolynomialProductView",
     "PolynomialProductSetView",
+    "ArrayF32",
+    "ArrayF64",
+    "ArrayFloat",
 ]

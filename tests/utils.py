@@ -1,9 +1,20 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import pytest
 
 import numpy as np
 
+from polynomials.hints import ArrayFloat
 
-def assert_allclose(a, b, rel=1e-6, atol=1e-12, nan_ok: bool = False):
+
+def assert_allclose(
+    a: ArrayFloat,
+    b: ArrayFloat,
+    rel: float = 1e-6,
+    atol: float = 1e-12,
+    nan_ok: bool = False,
+) -> None:
     a = np.asarray(a)
     b = np.array(b)
     if a.dtype != np.dtype(object) and b.dtype != np.dtype(object):
@@ -11,5 +22,5 @@ def assert_allclose(a, b, rel=1e-6, atol=1e-12, nan_ok: bool = False):
 
     assert a.size == b.size
 
-    for i, (x, y) in enumerate(zip(a, b)):
+    for x, y in zip(a, b):
         assert x == pytest.approx(y, rel, atol, nan_ok)

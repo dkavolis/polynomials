@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
+
 from __future__ import annotations
 
 from typing import (
@@ -19,7 +22,6 @@ from typing import (
     runtime_checkable,
     Optional,
 )
-from typing_extensions import ParamSpec
 
 import numpy as np
 import numpy.typing as npt
@@ -35,35 +37,35 @@ from polynomials.hints import (
     Polynomial,
     PolynomialProductSet,
     PolynomialProductSetView,
+    ArrayFloat,
 )
 
 if TYPE_CHECKING:
+    from typing_extensions import ParamSpec
     from polynomials.polynomials_cpp import Sobol
 
-# shapes are not yet supported so skip them...
-FloatArray = Union[npt.NDArray[np.float32], npt.NDArray[np.float64]]
+    P = ParamSpec("P")
 
-P = ParamSpec("P")
 R = TypeVar("R")
 N = TypeVar("N")
 
 
 @runtime_checkable
 class LinearModel(Protocol):
-    coef_: FloatArray
-    intercept_: Union[float, FloatArray]
+    coef_: ArrayFloat
+    intercept_: Union[float, ArrayFloat]
     fit_intercept: bool
 
     def fit(
-        self, X: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray]
+        self, X: ArrayFloat, y: ArrayFloat, sample_weight: Optional[ArrayFloat]
     ) -> None:
         ...
 
-    def predict(self, X: FloatArray) -> FloatArray:
+    def predict(self, X: ArrayFloat) -> ArrayFloat:
         ...
 
     def score(
-        self, X: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = ...
+        self, X: ArrayFloat, y: ArrayFloat, sample_weight: Optional[ArrayFloat] = ...
     ) -> float:
         ...
 
@@ -116,10 +118,10 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         else:
             self._pce = type(self).make_full_set(full_set)
         self._sobol: Sobol = None
-        self._sample_array: Optional[FloatArray] = None
+        self._sample_array: Optional[ArrayFloat] = None
 
     @property
-    def X_(self) -> FloatArray:
+    def X_(self) -> ArrayFloat:
         if self._sample_array is None:
             raise ValueError("Tried to access sample_array before fitting")
         return self._sample_array
@@ -164,10 +166,10 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
     def fit(
         self: PCEBaseType,
-        x: FloatArray,
-        y: FloatArray,
-        sample_weight: Optional[FloatArray] = None,
-        X: Optional[FloatArray] = None,
+        x: ArrayFloat,
+        y: ArrayFloat,
+        sample_weight: Optional[ArrayFloat] = None,
+        X: Optional[ArrayFloat] = None,
     ) -> PCEBaseType:
         """
         Fit linear model to PCE
@@ -222,9 +224,9 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         return self
 
     def sync_with_linear_model(self, target: Optional[int] = None) -> None:
-        coefficients: FloatArray = np.asanyarray(self.linear_model.coef_)
+        coefficients: ArrayFloat = np.asanyarray(self.linear_model.coef_)
 
-        intercept: Optional[FloatArray]
+        intercept: Optional[ArrayFloat]
         if self.linear_model.fit_intercept:
             intercept = np.asanyarray(self.linear_model.intercept_)
         else:
@@ -257,7 +259,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         self._set_coefficients(self._pce, coefficients, intercept_)
         self._sobol = None
 
-    def sample_array(self, x: FloatArray) -> FloatArray:
+    def sample_array(self, x: ArrayFloat) -> ArrayFloat:
         x = np.asanyarray(x)
 
         X = np.empty(  # type: ignore # constant...
@@ -270,7 +272,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
     def target_coefficients(
         self, target: Optional[int], copy: bool = True
-    ) -> FloatArray:
+    ) -> ArrayFloat:
         s: Union[slice, int]
         if target is None:
             s = slice(None)
@@ -302,11 +304,11 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
         return coefficients
 
-    def set_target_coefficients(self, target: int, coefficients: FloatArray) -> None:
+    def set_target_coefficients(self, target: int, coefficients: ArrayFloat) -> None:
         self.target_coefficients(target, False)[:] = coefficients
         self._fixup_intercept(target, lambda _, x: x)
 
-    def add_target_coefficients(self, target: int, delta: FloatArray) -> None:
+    def add_target_coefficients(self, target: int, delta: ArrayFloat) -> None:
         self.target_coefficients(target, False)[:] += delta
 
         def add_intercept(existing: float, value: float) -> float:
@@ -317,7 +319,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
     @staticmethod
     def _intercept_index(pce: PolynomialProductSet) -> Optional[int]:
         try:
-            i: Union[int, FloatArray] = pce.index([0] * pce.dimensions)
+            i: Union[int, ArrayFloat] = pce.index([0] * pce.dimensions)
             index: int
             if isinstance(i, int):
                 index = i
@@ -351,19 +353,19 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
             )
 
     def predict(
-        self, x: FloatArray, targets: Union[int, Sequence[int]] = 0
-    ) -> FloatArray:
-        def f(xx: FloatArray) -> FloatArray:
+        self, x: ArrayFloat, targets: Union[int, Sequence[int]] = 0
+    ) -> ArrayFloat:
+        def f(xx: ArrayFloat) -> ArrayFloat:
             return self._pce(xx)
 
         return self._eval_targets(targets, f, x)
 
     def score(
         self,
-        x: FloatArray,
-        y: FloatArray,
-        sample_weight: Optional[FloatArray] = None,
-        X: Optional[FloatArray] = None,
+        x: ArrayFloat,
+        y: ArrayFloat,
+        sample_weight: Optional[ArrayFloat] = None,
+        X: Optional[ArrayFloat] = None,
     ) -> float:
         if X is None:
             X = self.sample_array(x)  # type: ignore
@@ -371,21 +373,21 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
 
     def sensitivity(
         self, indices: Union[int, Sequence[int]], targets: Union[int, Sequence[int]] = 0
-    ) -> Union[float, FloatArray]:
-        def f(xx: FloatArray) -> Union[float, FloatArray]:
+    ) -> Union[float, ArrayFloat]:
+        def f(xx: ArrayFloat) -> Union[float, ArrayFloat]:
             return self._pce.sobol().sensitivity(xx)
 
         return self._eval_targets(targets, f, indices)
 
     def total_sensitivity(
         self, indices: Union[int, Iterable[int]], targets: Union[int, Iterable[int]] = 0
-    ) -> Union[float, FloatArray]:
-        def f(xx: FloatArray) -> Union[float, FloatArray]:
+    ) -> Union[float, ArrayFloat]:
+        def f(xx: ArrayFloat) -> Union[float, ArrayFloat]:
             return self._pce.sobol().total_sensitivity(xx)
 
         return self._eval_targets(targets, f, indices)
 
-    def total_sensitivities(self, targets: Union[int, Iterable[int]] = 0) -> FloatArray:
+    def total_sensitivities(self, targets: Union[int, Iterable[int]] = 0) -> ArrayFloat:
         return np.asanyarray(
             self.total_sensitivity(
                 cast(npt.NDArray[np.int32], np.arange(self.dimensions)),
@@ -401,7 +403,7 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         function: Callable[P, R],  # type: ignore
         *args: P.args,  # type: ignore
         **kwargs: P.kwargs,  # type: ignore
-    ) -> Union[R, FloatArray]:
+    ) -> Union[R, ArrayFloat]:
 
         if isinstance(targets, int):
             if targets < 0:
@@ -429,13 +431,13 @@ class PCEBase(metaclass=PCEMeta, is_abstract=True):
         return np.asarray(y)
 
     @property
-    def coefficients(self) -> FloatArray:
+    def coefficients(self) -> ArrayFloat:
         return self.linear_model.coef_
 
     @staticmethod
     def _set_coefficients(
         pce: PolynomialProductSet,
-        coefficients: FloatArray,
+        coefficients: ArrayFloat,
         intercept: Optional[float] = None,
     ):
         component: PolynomialProductSetView
@@ -469,11 +471,11 @@ class LegendreStieltjesPCE(PCEBase, tensor_type=LegendreStieltjesProductSet):
 
 
 def fit_improvement(
-    sensitivities: FloatArray,
-    previous_sensitivities: FloatArray,
+    sensitivities: ArrayFloat,
+    previous_sensitivities: ArrayFloat,
     axis: int = None,
-    out: FloatArray = None,
-) -> Union[float, FloatArray]:
+    out: ArrayFloat = None,
+) -> Union[float, ArrayFloat]:
     sensitivities = np.asarray(sensitivities)
     previous_sensitivities = np.asarray(previous_sensitivities)
     differences = np.abs(sensitivities - previous_sensitivities)
@@ -483,15 +485,15 @@ def fit_improvement(
 class AdaptivePCE:
     def __init__(self, pce: PCEBase, tolerance: float, targets: int = 1):
         self.pce = pce
-        self._sensitivities: FloatArray
+        self._sensitivities: ArrayFloat
         if pce.dimensions == 1:
             self._sensitivities = np.zeros([targets], dtype=np.double)
         else:
             self._sensitivities = np.zeros([pce.dimensions, targets], dtype=np.double)
-        self._errors: FloatArray = np.ones([targets]) * np.inf
+        self._errors: ArrayFloat = np.ones([targets]) * np.inf
         self.tolerance = tolerance
-        self._x: FloatArray = np.zeros([0])
-        self._y: FloatArray = np.zeros([0])
+        self._x: ArrayFloat = np.zeros([0])
+        self._y: ArrayFloat = np.zeros([0])
 
     @property
     def sample_count(self) -> int:
@@ -502,19 +504,19 @@ class AdaptivePCE:
         return len(self._errors)
 
     @property
-    def errors(self) -> FloatArray:
+    def errors(self) -> ArrayFloat:
         return self._errors
 
     @property
-    def sensitivities(self) -> FloatArray:
+    def sensitivities(self) -> ArrayFloat:
         return self._sensitivities
 
     @property
     def converged(self) -> bool:
-        return cast(bool, np.all(cast(FloatArray, self._errors <= self.tolerance)))
+        return cast(bool, np.all(cast(ArrayFloat, self._errors <= self.tolerance)))
 
     def fit(
-        self, x: FloatArray, y: FloatArray, sample_weight: Optional[FloatArray] = None
+        self, x: ArrayFloat, y: ArrayFloat, sample_weight: Optional[ArrayFloat] = None
     ) -> bool:
         y = np.asarray(y)
         targets = 1
@@ -535,25 +537,25 @@ class AdaptivePCE:
         return self.converged
 
     def improvement_value(
-        self, old_sensitivies: FloatArray
-    ) -> Union[float, FloatArray]:
+        self, old_sensitivies: ArrayFloat
+    ) -> Union[float, ArrayFloat]:
         if self.pce.dimensions == 1:
             # for consistency with multi-variate polynomials use relative change in
             # standard deviation as the error
             return np.abs(1.0 - self._sensitivities / old_sensitivies)
         return fit_improvement(self._sensitivities, old_sensitivies, axis=-1)
 
-    def has_converged(self, old_sensitivies: FloatArray) -> bool:
+    def has_converged(self, old_sensitivies: ArrayFloat) -> bool:
         errors = self.improvement_value(old_sensitivies)
-        return cast(bool, cast(FloatArray, errors <= self.tolerance).all())
+        return cast(bool, cast(ArrayFloat, errors <= self.tolerance).all())
 
     def improve(
         self,
-        x: FloatArray,
-        y: FloatArray,
+        x: ArrayFloat,
+        y: ArrayFloat,
         update_convergence: bool = True,
-        sample_weight: Optional[FloatArray] = None,
-        X: Optional[FloatArray] = None,
+        sample_weight: Optional[ArrayFloat] = None,
+        X: Optional[ArrayFloat] = None,
     ) -> bool:
         x = np.asarray(x)
         y = np.asarray(y)
@@ -569,10 +571,10 @@ class AdaptivePCE:
 
     def improve_extend(
         self,
-        x: FloatArray,
-        y: FloatArray,
+        x: ArrayFloat,
+        y: ArrayFloat,
         update_convergence: bool = True,
-        X: Optional[FloatArray] = None,
+        X: Optional[ArrayFloat] = None,
     ) -> bool:
         if self._x.size == 0:
             x = np.array(x, copy=True)
@@ -583,15 +585,15 @@ class AdaptivePCE:
         return self.improve(x, y, update_convergence, X=X)
 
     def predict(
-        self, x: FloatArray, targets: Union[int, Sequence[int]] = -1
-    ) -> FloatArray:
+        self, x: ArrayFloat, targets: Union[int, Sequence[int]] = -1
+    ) -> ArrayFloat:
         return self.pce.predict(x, targets)
 
     def score(
         self,
-        x: FloatArray,
-        y: FloatArray,
-        sample_weight: Optional[FloatArray] = None,
-        X: Optional[FloatArray] = None,
+        x: ArrayFloat,
+        y: ArrayFloat,
+        sample_weight: Optional[ArrayFloat] = None,
+        X: Optional[ArrayFloat] = None,
     ) -> float:
         return self.pce.score(x, y, sample_weight=sample_weight, X=X)
