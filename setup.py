@@ -9,6 +9,7 @@
     Learn more under: https://pyscaffold.org/
 """
 
+from distutils.util import strtobool
 import os
 import subprocess
 import sys
@@ -16,6 +17,7 @@ from typing import Any, Callable, List, Optional, Tuple
 from typing_extensions import ParamSpec
 from pkg_resources import VersionConflict, require
 from setuptools import Extension, setup
+from distutils.dist import Distribution
 from setuptools.command.build_ext import build_ext
 from mypy import stubgen
 import pathlib
@@ -58,6 +60,18 @@ def stringify(
     return wrapped
 
 
+class UserDistribution(Distribution):
+    def find_config_files(self) -> List[str]:
+        files: List[str] = super().find_config_files()  # type: ignore
+
+        local_file = "setup.user.cfg"
+        if os.path.isfile(local_file):
+            print("Using setup.user.cfg")
+            files.append(local_file)
+
+        return files
+
+
 class CMakeBuild(build_ext):
     user_options: List[Tuple[str, Any, str]] = build_ext.user_options
     user_options.extend(
@@ -65,6 +79,7 @@ class CMakeBuild(build_ext):
             ("cmake-options", None, "Additional options to pass to cmake"),
             ("vcpkg_dir", None, "Path to vcpkg"),
             ("vcpkg_triplet", None, "Triplet to use with vcpkg"),
+            ("vcpkg_manifest", None, "Enable/disable vcpkg manifest mode"),
             ("cxx_compiler", None, "Compiler to use for building the extension"),
             ("cmake_generator", None, "CMake generator to use"),
             ("build_type", None, "CMake build type (Debug, Release, RelWithDebInfo)"),
@@ -76,6 +91,7 @@ class CMakeBuild(build_ext):
         self.cmake_options = ""
         self.vcpkg_dir = ""
         self.vcpkg_triplet = ""
+        self.vcpkg_manifest = True
         self.cxx_compiler = ""
         self.cmake_generator = ""
         self.build_type = BuildType.Release
@@ -85,6 +101,9 @@ class CMakeBuild(build_ext):
 
         if isinstance(self.build_type, str):
             self.build_type = BuildType(self.build_type)
+
+        if isinstance(self.vcpkg_manifest, str):
+            self.vcpkg_manifest = bool(strtobool(self.vcpkg_manifest))
 
     @staticmethod
     def architecture() -> str:
@@ -228,6 +247,9 @@ class CMakeBuild(build_ext):
             if self.vcpkg_triplet:
                 cmake_args.append(f"-DVCPKG_TARGET_TRIPLET:STRING={self.vcpkg_triplet}")
 
+        if not self.vcpkg_manifest:
+            cmake_args.append("-DVCPKG_MANIFEST_MODE:BOOL=OFF")
+
         compiler = self.compiler_path()
         if compiler is not None:
             cmake_args.append(f"-DCMAKE_CXX_COMPILER:FILEPATH={compiler}")
@@ -273,4 +295,5 @@ if __name__ == "__main__":
         use_pyscaffold=True,
         ext_modules=[CMakeExtension("polynomials/polynomials_cpp")],
         cmdclass={"build_ext": CMakeBuild},
+        distclass=UserDistribution,
     )

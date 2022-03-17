@@ -19,6 +19,15 @@ Every polynomials has additional wrappers for:
 * `<Polynomial>Product` - N-dimensional polynomial product
 * `<Polynomial>ProductSet` - list of N-dimensional weighed polynomial products
 
+Python only wrappers:
+
+* `<Polynomial>PCE` - polynomial chaos expansion fitting and prediction, can be
+  used with any `sklearn` linear model though `sklearn.linear_model.Lasso`
+  works best
+* `AdaptivePCE` - adaptive version of polynomial chaos expansion using
+  difference of Sobol' indices or variances between successive fits as
+  convergence metric
+
 ## Building
 
 Cmake, [pybind11](https://github.com/pybind/pybind11) and [boost](https://boost.org) are required for building. Tested with pybind11 2.4.3 and boost 1.73.0 using MSVC 19.27.28826.0 but should compile with GCC and Clang.
@@ -35,15 +44,16 @@ Additional cmake options can be passed as
 python setup.py build --cmake-options="-DCMAKE_CXX_COMPILER=/usr/bin/g++"
 ```
 
-or in [setup.cfg](setup.cfg):
+or in [setup.user.cfg](setup.user.cfg):
 
 ```bash
 [build_ext]
 vcpkg_dir = ~/vcpkg
 vcpkg_triplet =
+vcpkg_manifest = true
 cxx_compiler = /usr/bin/g++
 cmake_generator = Ninja
-cmake-options =
+cmake_options =
 ```
 
 ## Installation

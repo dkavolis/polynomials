@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
+
+include(cmake/vcpkg.cmake)
+
 project(
   polynomials
   VERSION 0.1.0
@@ -23,9 +26,12 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   )
 endif()
 
-set(POLYNOMIALS_PYTHON_VERSION "3" CACHE STRING "Python version to build for")
+set(POLYNOMIALS_PYTHON_VERSION
+    "3"
+    CACHE STRING "Python version to build for")
 
-find_package(Python "${POLYNOMIALS_PYTHON_VERSION}" EXACT REQUIRED COMPONENTS Development.Module)
+find_package(Python "${POLYNOMIALS_PYTHON_VERSION}" EXACT REQUIRED
+             COMPONENTS Development.Module Interpreter)
 find_package(pybind11 REQUIRED)
 find_package(Boost REQUIRED)
 
