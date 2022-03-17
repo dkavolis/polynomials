@@ -1,10 +1,5 @@
 /**
- * @file tensor_product_set.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief Multidimensional set of polynomial tensor products
- * @date 29-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_TENSOR_PRODUCT_SET_HPP_
-#define SRC_POLYNOMIALS_TENSOR_PRODUCT_SET_HPP_
+#pragma once
 
 #include <optional>
 #include <vector>
@@ -398,5 +392,3 @@ class PolynomialProductSetIterator : public boost::iterator_facade<
 }  // namespace poly
 
 POLY_TEMPLATE_RANGE(poly::PolynomialProductSet)
-
-#endif  // SRC_POLYNOMIALS_TENSOR_PRODUCT_SET_HPP_

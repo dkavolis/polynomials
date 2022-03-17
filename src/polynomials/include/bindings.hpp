@@ -1,10 +1,5 @@
 /**
- * @file bindings.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief
- * @date 12-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_BINDINGS_HPP_
-#define SRC_POLYNOMIALS_BINDINGS_HPP_
+#pragma once
 
 #include "polynomials.hpp"
 
@@ -44,6 +38,9 @@ MSVC_WARNING_POP()
 namespace py = pybind11;
 
 namespace poly {
+
+using ssize_t = std::ptrdiff_t;
+using size_t = std::size_t;
 
 // map arbitrary floating point types to fundamental for numpy compatibility
 template <class T, typename = void>
@@ -1225,5 +1222,3 @@ void bind_all_polynomials(py::module& m, std::string const& name) {
 }
 
 }  // namespace poly
-
-#endif  // SRC_POLYNOMIALS_BINDING

@@ -1,10 +1,5 @@
 /**
- * @file sequence.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief Iterable polynomial value range at constant x
- * @date 20-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_SEQUENCE_HPP_
-#define SRC_POLYNOMIALS_SEQUENCE_HPP_
+#pragma once
 
 #include "config.hpp"
 
@@ -132,5 +126,3 @@ auto polynomial_sequence(typename T::Traits::OrderType end_order, typename T::Tr
 }  // namespace poly
 
 POLY_TEMPLATE_RANGE(poly::SequenceRange)
-
-#endif  // SRC_POLYNOMIALS_SEQUENCE_HPP_

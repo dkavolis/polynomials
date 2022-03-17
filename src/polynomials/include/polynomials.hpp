@@ -1,10 +1,5 @@
 /**
- * @file boost.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief
- * @date 12-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_BOOST_HPP_
-#define SRC_POLYNOMIALS_BOOST_HPP_
+#pragma once
 
 #include "boost_polynomials.hpp"
 #include "config.hpp"
@@ -53,12 +47,11 @@
   using name##Series = name##PolynomialSeries<Quad>;                                          \
                                                                                               \
   template <class Real>                                                                       \
-  using name##PolynomialProduct = PolynomialProduct<name##Polynomial<Real>>;      \
+  using name##PolynomialProduct = PolynomialProduct<name##Polynomial<Real>>;                  \
   template <class Real, template <class> class Allocator = std::allocator>                    \
-  using name##PolynomialProductSet =                                                    \
-      PolynomialProductSet<name##Polynomial<Real>, Allocator>;                          \
-  using name##Product = name##PolynomialProduct<Quad>;                            \
-  using name##ProductSet = name##PolynomialProductSet<Quad>;                      \
+  using name##PolynomialProductSet = PolynomialProductSet<name##Polynomial<Real>, Allocator>; \
+  using name##Product = name##PolynomialProduct<Quad>;                                        \
+  using name##ProductSet = name##PolynomialProductSet<Quad>;                                  \
                                                                                               \
   template <class Real>                                                                       \
   auto nname##_sequence(typename name##Polynomial<Real>::Traits::OrderType end_order, Real x) \
@@ -78,8 +71,8 @@ POLY_POLYNOMIALS_DECLARE(Chebyshev, chebyshev)
 namespace poly {
 
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#  define POLY_EXTERN_POLYNOMIAL(name)                                     \
-    extern template struct name##Impl<Quad>;                               \
+#  define POLY_EXTERN_POLYNOMIAL(name)                               \
+    extern template struct name##Impl<Quad>;                         \
     extern template class PolynomialProduct<name##Polynomial<Quad>>; \
     extern template class PolynomialProductSet<name##Polynomial<Quad>>;
 
@@ -98,5 +91,3 @@ extern template class SobolIterator<Quad>;
 extern template class Sobol<Quad>;
 }  // namespace poly
 #endif
-
-#endif  // SRC_POLYNOMIALS_BOOST_HPP_

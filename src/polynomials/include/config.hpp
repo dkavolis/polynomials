@@ -1,10 +1,5 @@
 /**
- * @file config.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief Constant values for package
- * @date 20-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_CONFIG_HPP_
-#define SRC_POLYNOMIALS_CONFIG_HPP_
+#pragma once
 
 #ifndef POLY_HEADER_ONLY
 #  define POLY_HEADER_ONLY 1
@@ -96,5 +90,3 @@ constexpr static inline narrowing_check<false> no_narrowing_check{};
   };                                                 \
                                                      \
   }  // namespace boost
-
-#endif  // SRC_POLYNOMIALS_CONFIG_HPP_

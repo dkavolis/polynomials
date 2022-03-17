@@ -1,10 +1,5 @@
 /**
- * @file quadrature.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief Wrapper for compile-time to run-time sized quadrature rules
- * @date 21-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_QUADRATURE_HPP_
-#define SRC_POLYNOMIALS_QUADRATURE_HPP_
+#pragma once
 
 #include <array>
 #include <vector>
@@ -145,5 +139,3 @@ template <typename Real, unsigned N = QuadraturePoints>
 using GaussKronrodQuadrature = detail::Quadrature<Real, detail::GaussKronrodQuadrature, N, true>;
 
 }  // namespace poly
-
-#endif  // SRC_POLYNOMIALS_QUADRATURE_HPP_

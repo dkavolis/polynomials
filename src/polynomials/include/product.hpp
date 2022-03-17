@@ -1,10 +1,5 @@
 /**
- * @file tensor.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief Multidimensional tensor product of polynomials
- * @date 20-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_TENSOR_PRODUCT_HPP_
-#define SRC_POLYNOMIALS_TENSOR_PRODUCT_HPP_
+#pragma once
 
 #include "config.hpp"
 
@@ -212,5 +206,3 @@ class PolynomialProduct {
 }  // namespace poly
 
 POLY_TEMPLATE_RANGE(poly::PolynomialProduct)
-
-#endif  // SRC_POLYNOMIALS_TENSOR_PRODUCT_HPP_

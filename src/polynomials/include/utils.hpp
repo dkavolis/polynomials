@@ -1,10 +1,5 @@
 /**
- * @file utils.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief Common utility functions
- * @date 20-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_UTILS_HPP_
-#define SRC_POLYNOMIALS_UTILS_HPP_
+#pragma once
 
 #include <array>
 #include <stdexcept>
@@ -38,7 +32,7 @@
 MSVC_WARNING_DISABLE(4619)
 #include <boost/container_hash/hash.hpp>
 #include <boost/range/adaptor/indexed.hpp>
-#include <boost/tuple/tuple.hpp>
+// #include <boost/tuple/tuple.hpp>
 MSVC_WARNING_POP()
 
 #include "traits.hpp"
@@ -369,5 +363,3 @@ struct range_iterator<
   using type = typename T::iterator;
 };
 }  // namespace boost
-
-#endif  // SRC_POLYNOMIALS_UTILS_HPP_

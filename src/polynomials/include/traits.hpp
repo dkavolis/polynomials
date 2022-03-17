@@ -1,10 +1,5 @@
 /**
- * @file traits.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief Type traits for polynomials
- * @date 20-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_TRAITS_HPP_
-#define SRC_POLYNOMIALS_TRAITS_HPP_
+#pragma once
 
 #include <type_traits>
 #include <utility>
@@ -115,5 +109,3 @@ struct PolynomialTraits {
   constexpr static inline bool is_orthogonal = detail::is_orthogonal<Impl>::value;
 };
 }  // namespace poly
-
-#endif  // SRC_POLYNOMIALS_TRAITS_HPP_

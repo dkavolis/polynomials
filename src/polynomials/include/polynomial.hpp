@@ -1,10 +1,5 @@
 /**
- * @file polynomial.hpp
- * @author Daumantas Kavolis <dkavolis>
- * @brief Polynomial wrapper for concrete implementations
- * @date 21-Jun-2020
- *
- * Copyright (c) 2020 <Daumantas Kavolis>
+ * Copyright (c) 2022 <Daumantas Kavolis>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +20,7 @@
  * SOFTWARE.
  */
 
-#ifndef SRC_POLYNOMIALS_POLYNOMIAL_HPP_
-#define SRC_POLYNOMIALS_POLYNOMIAL_HPP_
+#pragma once
 
 #include "traits.hpp"
 
@@ -64,14 +58,12 @@ class Polynomial {
   }
 
   template <bool check = false>
-  [[nodiscard]] auto weights(bounds_check<check> c = no_bounds_check) const
-      -> view<Real const> {
+  [[nodiscard]] auto weights(bounds_check<check> c = no_bounds_check) const -> view<Real const> {
     static_assert(Traits::has_weights, "Polynomial does not support weights");
     return Impl::weights(data_, c);
   }
   template <bool check = false>
-  [[nodiscard]] auto abscissa(bounds_check<check> c = no_bounds_check) const
-      -> view<Real const> {
+  [[nodiscard]] auto abscissa(bounds_check<check> c = no_bounds_check) const -> view<Real const> {
     static_assert(Traits::has_abscissa, "Polynomial does not support abscissa");
     return Impl::abscissa(data_, c);
   }
@@ -95,5 +87,3 @@ class Polynomial {
   Storage data_{Impl::make_storage()};
 };
 }  // namespace poly
-
-#endif  // SRC_POLYNOMIALS_POLYNOMIAL_HPP_
